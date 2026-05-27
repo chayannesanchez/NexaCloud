@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexaCloud - Centro de Soporte | Panel de Control</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="support-style.css">
+    <script src="../api-config.js"></script>
+    <script src="../auth-cognito.js"></script>
+</head>
+<body>
+    <script>
+        if (!cognito_isAuthenticated()) {
+            window.location.href = '../login/login.html';
+        }
+    </script>
+
+    <div id="navbar-container"></div>
+
+    <div class="container">
+        <div class="page-header">
+            <h1 class="page-title">Panel de Control - Soporte Técnico</h1>
+            <p class="page-subtitle">Gestiona todos los tickets de soporte de los clientes</p>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="stat-card open">
+                <div class="stat-label">Abiertos</div>
+                <div class="stat-number" id="countOpen">0</div>
+            </div>
+            <div class="stat-card assigned">
+                <div class="stat-label">Asignados</div>
+                <div class="stat-number" id="countAssigned">0</div>
+            </div>
+            <div class="stat-card in-progress">
+                <div class="stat-label">En Progreso</div>
+                <div class="stat-number" id="countInProgress">0</div>
+            </div>
+            <div class="stat-card resolved">
+                <div class="stat-label">Resueltos</div>
+                <div class="stat-number" id="countResolved">0</div>
+            </div>
+            <div class="stat-card closed">
+                <div class="stat-label">Cerrados</div>
+                <div class="stat-number" id="countClosed">0</div>
+            </div>
+        </div>
+
+        <div class="controls-section">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="Buscar por ID, cliente o asunto...">
+            </div>
+            <div class="filter-group">
+                <select id="filterStatus" style="min-width: 150px;">
+                    <option value="">Todos los Estados</option>
+                    <option value="open">Sin revisar</option>
+                    <option value="assigned">Asignados</option>
+                    <option value="in-progress">En Progreso</option>
+                    <option value="resolved">Resueltos</option>
+                    <option value="closed">Cerrados</option>
+                </select>
+                <select id="filterPriority" style="min-width: 120px;">
+                    <option value="">Todas las Prioridades</option>
+                    <option value="low">Baja</option>
+                    <option value="medium">Media</option>
+                    <option value="high">Alta</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="openCreateModal()">➕ Nuevo Ticket</button>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('all', this)">Todos los Tickets</button>
+            <button class="tab" onclick="switchTab('assigned', this)">Asignados a Mí</button>
+            <button class="tab" onclick="switchTab('urgent', this)">Urgentes</button>
+        </div>
+
+        <div id="ticketsContainer">
+            <div class="empty-state">
+                <div class="empty-state-icon">📋</div>
+                <p>Cargando tickets...</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="viewModal">
+        <div class="modal modal-large">
+            <div class="modal-header">
+                <h2 class="card-title">Detalles del Ticket</h2>
+                <button class="modal-close" onclick="closeModal('viewModal')">×</button>
+            </div>
+            <div id="modalContent" style="max-height: 600px; overflow-y: auto;"></div>
+            <div style="display: flex; gap: 1rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                <button class="btn btn-primary" onclick="openEditModal()">✏️ Editar</button>
+                <button class="btn btn-secondary" onclick="closeModal('viewModal')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="editModal">
+        <div class="modal modal-large">
+            <div class="modal-header">
+                <h2 class="card-title">Editar Ticket</h2>
+                <button class="modal-close" onclick="closeModal('editModal')">×</button>
+            </div>
+            <form id="editForm">
+                <div class="form-group">
+                    <label for="editStatus">Estado</label>
+                    <select id="editStatus" required>
+                        <option value="open">Sin revisar</option>
+                        <option value="assigned">Asignado</option>
+                        <option value="in-progress">En Proceso</option>
+                        <option value="resolved">Resuelto</option>
+                        <option value="closed">Cerrado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editAssignee">Asignado a</label>
+                    <input type="text" id="editAssignee" placeholder="Nombre del técnico">
+                </div>
+                <div class="form-group">
+                    <label for="editNote">Agregar Nota</label>
+                    <textarea id="editNote" placeholder="Escribe una nota interna sobre este ticket..."></textarea>
+                </div>
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">💾 Guardar Cambios</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('editModal')">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="createModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="card-title">Crear Nuevo Ticket</h2>
+                <button class="modal-close" onclick="closeModal('createModal')">×</button>
+            </div>
+            <form id="createForm">
+                <div class="form-group">
+                    <label for="createFullname">Nombre Completo</label>
+                    <input type="text" id="createFullname" placeholder="Nombre del cliente" required>
+                </div>
+                <div class="form-group">
+                    <label for="createEmail">Correo Electrónico</label>
+                    <input type="email" id="createEmail" placeholder="cliente@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="createSubject">Asunto</label>
+                    <input type="text" id="createSubject" placeholder="Asunto del ticket" required>
+                </div>
+                <div class="form-group">
+                    <label for="createDescription">Descripción</label>
+                    <textarea id="createDescription" placeholder="Descripción del problema" required></textarea>
+                </div>
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">Crear Ticket</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('createModal')">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 NexaCloud. Todos los derechos reservados.</p>
+        <p>Panel de Control de Soporte Técnico | Versión 1.0</p>
+    </footer>
+
+    <script>
+        let allTickets = [];
+        let currentFilter = 'all';
+        let currentTicketId = null;
+
+        async function loadNavbar() {
+            const container = document.getElementById('navbar-container');
+            if (!container) return;
+            try {
+                const response = await fetch('support-nav.html');
+                container.innerHTML = await response.text();
+                const logoutLink = document.getElementById('logoutLink');
+                if (logoutLink) {
+                    logoutLink.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        cognito_logout(true);
+                    });
+                }
+            } catch (error) {
+                console.error('No se pudo cargar support-nav.html', error);
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function formatLabel(value) {
+            const labels = {
+                open: 'SIN REVISAR',
+                assigned: 'ASIGNADO',
+                'in-progress': 'EN PROCESO',
+                resolved: 'RESUELTO',
+                closed: 'CERRADO',
+                low: 'Baja',
+                medium: 'Media',
+                high: 'Alta'
+            };
+            return labels[value] || value || 'N/A';
+        }
+
+        async function loadTickets() {
+            try {
+                const response = await getAllTickets();
+                allTickets = response.success ? (response.tickets || []) : [];
+            } catch (error) {
+                console.error('Error al cargar tickets desde API:', error);
+                allTickets = [];
+                alert('No se pudieron cargar los tickets. Verifica tu sesión y el despliegue del API.');
+            }
+            updateDashboard();
+            renderTickets();
+        }
+
+        function updateDashboard() {
+            document.getElementById('countOpen').textContent = allTickets.filter(t => t.status === 'open').length;
+            document.getElementById('countAssigned').textContent = allTickets.filter(t => t.status === 'assigned').length;
+            document.getElementById('countInProgress').textContent = allTickets.filter(t => t.status === 'in-progress').length;
+            document.getElementById('countResolved').textContent = allTickets.filter(t => t.status === 'resolved').length;
+            document.getElementById('countClosed').textContent = allTickets.filter(t => t.status === 'closed').length;
+        }
+
+        function getFilteredTickets() {
+            let filtered = [...allTickets];
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+            const filterStatus = document.getElementById('filterStatus').value;
+            const filterPriority = document.getElementById('filterPriority').value;
+            const currentUser = cognito_getCurrentUser();
+
+            if (currentFilter === 'assigned') {
+                filtered = filtered.filter(t => String(t.assignee || '').toLowerCase() === String(currentUser || '').toLowerCase());
+            }
+            if (currentFilter === 'urgent') {
+                filtered = filtered.filter(t => t.priority === 'high');
+            }
+            if (searchTerm) {
+                filtered = filtered.filter(t =>
+                    String(t.id || '').toLowerCase().includes(searchTerm) ||
+                    String(t.fullname || '').toLowerCase().includes(searchTerm) ||
+                    String(t.subject || '').toLowerCase().includes(searchTerm)
+                );
+            }
+            if (filterStatus) filtered = filtered.filter(t => t.status === filterStatus);
+            if (filterPriority) filtered = filtered.filter(t => t.priority === filterPriority);
+            return filtered;
+        }
+
+        function renderTickets() {
+            const container = document.getElementById('ticketsContainer');
+            const filtered = getFilteredTickets();
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🔍</div>
+                        <p>No se encontraron tickets que coincidan con los criterios de búsqueda</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(ticket => `
+                <div class="ticket-row">
+                    <div class="ticket-id">${escapeHtml(ticket.id)}</div>
+                    <div class="ticket-subject">
+                        <div>${escapeHtml(ticket.subject)}</div>
+                        <div class="ticket-customer">${escapeHtml(ticket.fullname)}</div>
+                    </div>
+                    <div>
+                        <span class="priority-indicator priority-${escapeHtml(ticket.priority)}"></span>
+                        ${escapeHtml(formatLabel(ticket.priority))}
+                    </div>
+                    <div>
+                        <span class="status-badge status-${escapeHtml(ticket.status || '')}">
+                            ${escapeHtml(formatLabel(ticket.status))}
+                        </span>
+                    </div>
+                    <div>${ticket.assignee ? escapeHtml(ticket.assignee) : '<em style="color: var(--text-secondary);">Sin asignar</em>'}</div>
+                    <div class="ticket-actions">
+                        <button class="btn btn-sm btn-primary" onclick="viewTicket('${escapeHtml(ticket.id)}')">👁️ Ver</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function viewTicket(ticketId) {
+            currentTicketId = ticketId;
+            const ticket = allTickets.find(t => t.id === ticketId);
+            if (!ticket) return;
+
+            const notesHtml = Array.isArray(ticket.notes) && ticket.notes.length > 0
+                ? `<div class="notes-section"><h3 style="margin-bottom: 1rem;">Notas Internas</h3>${ticket.notes.map(note => `
+                    <div class="note">
+                        <div class="note-header">
+                            <span class="note-author">${escapeHtml(note.author)}</span>
+                            <span class="note-time">${escapeHtml(note.time)}</span>
+                        </div>
+                        <p style="margin: 0;">${escapeHtml(note.text)}</p>
+                    </div>
+                `).join('')}</div>`
+                : '';
+
+            document.getElementById('modalContent').innerHTML = `
+                <div class="detail-row"><span class="detail-label">ID:</span><span class="detail-value">${escapeHtml(ticket.id)}</span></div>
+                <div class="detail-row"><span class="detail-label">Cliente:</span><span class="detail-value">${escapeHtml(ticket.fullname)} (${escapeHtml(ticket.email)})</span></div>
+                <div class="detail-row"><span class="detail-label">Teléfono:</span><span class="detail-value">${escapeHtml(ticket.phone || 'N/A')}</span></div>
+                <div class="detail-row"><span class="detail-label">Categoría:</span><span class="detail-value">${escapeHtml(formatLabel(ticket.category))}</span></div>
+                <div class="detail-row"><span class="detail-label">Prioridad:</span><span class="detail-value"><span class="priority-indicator priority-${escapeHtml(ticket.priority)}"></span>${escapeHtml(formatLabel(ticket.priority))}</span></div>
+                <div class="detail-row"><span class="detail-label">Estado:</span><span class="detail-value"><span class="status-badge status-${escapeHtml(ticket.status || '')}">${escapeHtml(formatLabel(ticket.status))}</span></span></div>
+                <div class="detail-row"><span class="detail-label">Asignado a:</span><span class="detail-value">${escapeHtml(ticket.assignee || 'Sin asignar')}</span></div>
+                <div class="detail-row"><span class="detail-label">Creado:</span><span class="detail-value">${escapeHtml(ticket.createdAt)}</span></div>
+                <div class="detail-row"><span class="detail-label">Asunto:</span><span class="detail-value">${escapeHtml(ticket.subject)}</span></div>
+                <div class="detail-row"><span class="detail-label">Descripción:</span><span class="detail-value">${escapeHtml(ticket.description)}</span></div>
+                ${notesHtml}
+            `;
+            document.getElementById('viewModal').classList.add('active');
+        }
+
+        function openEditModal() {
+            const ticket = allTickets.find(t => t.id === currentTicketId);
+            if (!ticket) return;
+            document.getElementById('editStatus').value = ticket.status || 'open';
+            document.getElementById('editAssignee').value = ticket.assignee || '';
+            document.getElementById('editNote').value = '';
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        document.getElementById('editForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Guardando...';
+
+            try {
+                const updateData = {
+                    status: document.getElementById('editStatus').value,
+                    assignee: document.getElementById('editAssignee').value.trim(),
+                    notes: document.getElementById('editNote').value.trim()
+                };
+                const response = await updateTicket(currentTicketId, updateData);
+                if (!response.success) throw new Error(response.message || 'Error desconocido');
+                await loadTickets();
+                closeModal('editModal');
+                closeModal('viewModal');
+                alert('✅ Ticket actualizado correctamente');
+            } catch (error) {
+                alert('❌ Error al actualizar: ' + error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        });
+
+        function openCreateModal() {
+            document.getElementById('createForm').reset();
+            document.getElementById('createModal').classList.add('active');
+        }
+
+        document.getElementById('createForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Creando...';
+
+            try {
+                const response = await createTicket({
+                    fullname: document.getElementById('createFullname').value.trim(),
+                    email: document.getElementById('createEmail').value.trim(),
+                    phone: '',
+                    category: 'general',
+                    priority: 'medium',
+                    subject: document.getElementById('createSubject').value.trim(),
+                    description: document.getElementById('createDescription').value.trim(),
+                    status: 'open',
+                    assignee: null
+                });
+                if (!response.success) throw new Error(response.message || 'Error desconocido');
+                await loadTickets();
+                closeModal('createModal');
+                alert('✅ Nuevo ticket creado: ' + (response.ticketId || response.id));
+            } catch (error) {
+                alert('❌ Error al crear: ' + error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        });
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function switchTab(tab, element) {
+            currentFilter = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            if (element) element.classList.add('active');
+            renderTickets();
+        }
+
+        document.getElementById('searchInput').addEventListener('input', renderTickets);
+        document.getElementById('filterStatus').addEventListener('change', renderTickets);
+        document.getElementById('filterPriority').addEventListener('change', renderTickets);
+
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', function(e) {
+                if (e.target === this) this.classList.remove('active');
+            });
+        });
+
+        loadNavbar();
+        loadTickets();
+    </script>
+</body>
+</html>

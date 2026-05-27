@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexaCloud - Centro de Soporte | Crear Ticket</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="form-style.css">
+    <script src="../api-config.js"></script>
+</head>
+<body>
+    <div id="navbar-container"></div>
+
+    <div class="container">
+        <div class="page-header">
+            <h1 class="page-title">Crear Nuevo Ticket de Soporte</h1>
+            <p class="page-subtitle">Describe tu problema y nos ayudaremos a resolverlo lo antes posible</p>
+        </div>
+
+        <div class="form-container">
+            <div class="form-card">
+                <div class="form-description">
+                    <p>
+                        ✓ Completa el formulario con la mayor cantidad de detalles posible para que nuestro equipo 
+                        pueda ayudarte más rápidamente. Tu ticket será asignado a un especialista en poco tiempo.
+                    </p>
+                </div>
+
+                <form id="ticketForm">
+                    <!-- Nombre Completo -->
+                    <div class="form-group">
+                        <label for="fullname">Nombre Completo *</label>
+                        <input 
+                            type="text" 
+                            id="fullname" 
+                            name="fullname" 
+                            placeholder="Tu nombre completo"
+                            required
+                        >
+                    </div>
+
+                    <!-- Correo Electrónico -->
+                    <div class="form-group">
+                        <label for="email">Correo Electrónico *</label>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            placeholder="tu@email.com"
+                            required
+                        >
+                    </div>
+
+                    <!-- Teléfono -->
+                    <div class="form-group">
+                        <label for="phone">Teléfono</label>
+                        <input 
+                            type="tel" 
+                            id="phone" 
+                            name="phone" 
+                            placeholder="+57 (000) 000-0000"
+                        >
+                    </div>
+
+                    <!-- Categoría -->
+                    <div class="form-group">
+                        <label>Categoría del Problema *</label>
+                        <div class="category-options">
+                            <label class="category-option">
+                                <input type="radio" name="category" value="technical" required>
+                                <span>🔧 Técnico</span>
+                            </label>
+                            <label class="category-option">
+                                <input type="radio" name="category" value="billing">
+                                <span>💳 Facturación</span>
+                            </label>
+                            <label class="category-option">
+                                <input type="radio" name="category" value="account">
+                                <span>👤 Cuenta</span>
+                            </label>
+                            <label class="category-option">
+                                <input type="radio" name="category" value="general">
+                                <span>❓ General</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Prioridad -->
+                    <div class="form-group">
+                        <label>Nivel de Prioridad *</label>
+                        <div class="priority-options">
+                            <label class="priority-option low">
+                                <input type="radio" name="priority" value="low" required checked>
+                                <span>Baja</span>
+                            </label>
+                            <label class="priority-option medium">
+                                <input type="radio" name="priority" value="medium">
+                                <span>Media</span>
+                            </label>
+                            <label class="priority-option high">
+                                <input type="radio" name="priority" value="high">
+                                <span>Alta</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Asunto -->
+                    <div class="form-group">
+                        <label for="subject">Asunto *</label>
+                        <input 
+                            type="text" 
+                            id="subject" 
+                            name="subject" 
+                            placeholder="Resumen breve del problema"
+                            maxlength="100"
+                            required
+                        >
+                        <div class="character-count">
+                            <span id="subjectCount">0</span>/100
+                        </div>
+                    </div>
+
+                    <!-- Descripción -->
+                    <div class="form-group">
+                        <label for="description">Descripción Detallada *</label>
+                        <textarea 
+                            id="description" 
+                            name="description" 
+                            placeholder="Por favor, describe el problema con el máximo de detalles: qué pasó, cuándo, qué pasos realizaste, etc."
+                            maxlength="2000"
+                            required
+                        ></textarea>
+                        <div class="character-count">
+                            <span id="descriptionCount">0</span>/2000
+                        </div>
+                    </div>
+
+                   <!-- Términos -->
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="terms" required>
+                            Acepto los términos de servicio y la política de privacidad
+                        </label>
+                    </div>
+
+                    <!-- Botones -->
+                    <div class="btn-group">
+                        <button type="submit" class="btn btn-primary">
+                            📤 Enviar Ticket
+                        </button>
+                        <button type="reset" class="btn btn-secondary">
+                            🔄 Limpiar Formulario
+                        </button>
+                    </div>
+                </form>
+
+                <div class="alert alert-success success-message" id="successMessage" style="margin-top: 2rem;">
+                    <div>
+                        <strong>✅ ¡Tu ticket ha sido creado exitosamente!</strong><br>
+                        <span id="ticketId" style="font-size: 0.875rem; margin-top: 0.5rem; display: block;"></span>
+                        <div class="copy-box">
+                            <button type="button" class="btn btn-secondary" id="copyTicketBtn">📋 Copiar número</button>
+                            <a class="btn btn-primary" id="trackTicketLink" href="../track/track.html">🔎 Consultar seguimiento</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 NexaCloud. Todos los derechos reservados.</p>
+        <p>
+            <a href="#privacy">Política de Privacidad</a> | 
+            <a href="#terms">Términos de Servicio</a> | 
+            <a href="#contact">Contacto</a>
+        </p>
+    </footer>
+
+    <script>
+        async function loadNavbar() {
+            const container = document.getElementById('navbar-container');
+            if (!container) {
+                return;
+            }
+
+            try {
+                const response = await fetch('form-nav.html');
+                container.innerHTML = await response.text();
+            } catch (error) {
+                console.error('No se pudo cargar form-nav.html', error);
+            }
+        }
+
+        loadNavbar();
+
+        let selectedFiles = [];
+        function updateFileList() {
+            // La versión actual no sube archivos; se conserva el contador para compatibilidad del formulario.
+        }
+
+        // Contador de caracteres
+        const subjectInput = document.getElementById('subject');
+        const descriptionInput = document.getElementById('description');
+        const subjectCount = document.getElementById('subjectCount');
+        const descriptionCount = document.getElementById('descriptionCount');
+
+        subjectInput.addEventListener('input', function() {
+            subjectCount.textContent = this.value.length;
+        });
+
+        descriptionInput.addEventListener('input', function() {
+            descriptionCount.textContent = this.value.length;
+        });
+
+        // Manejo del formulario
+        document.getElementById('ticketForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            // Validación
+            if (!document.querySelector('input[name="category"]:checked')) {
+                alert('Por favor, selecciona una categoría');
+                return;
+            }
+
+            // Obtener datos del formulario
+            const ticketData = {
+                fullname: document.getElementById('fullname').value.trim(),
+                email: document.getElementById('email').value.trim(),
+                phone: document.getElementById('phone').value.trim(),
+                category: document.querySelector('input[name="category"]:checked').value,
+                priority: document.querySelector('input[name="priority"]:checked').value,
+                subject: document.getElementById('subject').value.trim(),
+                description: document.getElementById('description').value.trim(),
+                attachments: selectedFiles.length,
+                createdAt: new Date().toISOString()
+            };
+
+            // Desactivar botón de envío
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Enviando...';
+
+            try {
+                // Llamar al API para crear el ticket
+                const response = await createTicket(ticketData);
+                
+                if (response.success) {
+                    // Mostrar mensaje de éxito
+                    const generatedTicketId = response.ticketId || response.id;
+                    document.getElementById('ticketId').textContent = 
+                        'Número de Ticket: ' + generatedTicketId + ' | Guárdalo para consultar el estado de tu reporte.';
+                    document.getElementById('trackTicketLink').href = '../track/track.html?id=' + encodeURIComponent(generatedTicketId);
+                    document.getElementById('copyTicketBtn').onclick = async function() {
+                        try {
+                            await navigator.clipboard.writeText(generatedTicketId);
+                            this.textContent = '✅ Copiado';
+                            setTimeout(() => this.textContent = '📋 Copiar número', 1800);
+                        } catch (error) {
+                            alert('Número de ticket: ' + generatedTicketId);
+                        }
+                    };
+                    document.getElementById('successMessage').style.display = 'flex';
+
+                    // Limpiar formulario
+                    this.reset();
+                    selectedFiles = [];
+                    updateFileList();
+                    subjectCount.textContent = '0';
+                    descriptionCount.textContent = '0';
+
+                    // Scroll hacia el mensaje de éxito
+                    setTimeout(() => {
+                        document.getElementById('successMessage').scrollIntoView({ behavior: 'smooth' });
+                    }, 100);
+                } else {
+                    alert('❌ Error al crear el ticket: ' + (response.message || 'Error desconocido'));
+                }
+            } catch (error) {
+                console.error('Error en createTicket:', error);
+                alert('❌ Error de conexión. Verifica la configuración del API en api-config.js');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        });
+    </script>
+</body>
+</html>

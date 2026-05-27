@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexaCloud - Centro de Soporte Técnico</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="index-style.css">
+    <script src="https://cdn.jsdelivr.net/npm/jwt-decode@3/build/jwt-decode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aws-sdk@2/dist/aws-sdk.min.js"></script>
+    <script src="../api-config.js"></script>
+    <script src="../auth-cognito.js"></script>
+</head>
+<body>
+    <div id="navbar-container"></div>
+
+    <!-- HERO SECTION -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-icon">☁️</div>
+            <h1>Centro de Soporte Técnico NexaCloud</h1>
+            <p>
+                Plataforma de soporte técnico escalable construida en AWS con API Gateway y Lambdas serverless. 
+                Crea tickets, obtén respuestas rápidas y gestiona todo tu proceso desde una consola inteligente.
+            </p>
+            <div class="cta-buttons">
+                <a href="../form/form.html" class="btn-large primary">📝 Crear Ticket de Soporte</a>
+                <a href="../track/track.html" class="btn-large secondary">🔎 Consultar Ticket</a>
+                <a href="../login/login.html" class="btn-large secondary">🔐 Panel de Soporte</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- CONTAINER -->
+    <div class="container">
+        <!-- FEATURES -->
+        <section class="features" id="features">
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Arquitectura Serverless</h3>
+                <p>API Gateway + Lambdas en AWS para escalabilidad automática sin preocupaciones de infraestructura.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Dashboard en Tiempo Real</h3>
+                <p>Visualiza estadísticas y manage todos tus tickets desde una consola intuitiva y responsive.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔌</div>
+                <h3>API RESTful Completa</h3>
+                <p>Integra fácilmente con tus sistemas existentes a través de nuestra API Gateway documentada.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <h3>Multi-dispositivo</h3>
+                <p>Accede desde cualquier dispositivo: desktop, tablet o móvil, siempre sincronizado en tiempo real.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔐</div>
+                <h3>Autenticación JWT</h3>
+                <p>Seguridad de nivel empresarial con tokens JWT y autenticación integrada en Lambdas.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📈</div>
+                <h3>Escalabilidad Infinita</h3>
+                <p>Soporta millones de solicitudes simultáneas sin necesidad de provisionar infraestructura.</p>
+            </div>
+        </section>
+
+        <!-- STEPS -->
+        <section class="steps" id="how-it-works">
+            <h2>¿Cómo Funciona?</h2>
+            <div class="steps-grid">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h4>Envias tu solicitud</h4>
+                    <p>Completas el formulario con tus datos y la descripcion del problema para crear el ticket.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h4>Confirmamos recepcion</h4>
+                    <p>El sistema registra tu caso y te entrega un número de ticket para consultar el estado en línea.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h4>Soporte revisa el ticket</h4>
+                    <p>El equipo de soporte entra al panel, analiza tu caso y define la prioridad de atencion.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h4>Trabajamos en la solucion</h4>
+                    <p>Se realizan las acciones necesarias para resolver el problema y documentar el avance interno.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <h4>Te compartimos resultado</h4>
+                    <p>Cuando hay una resolucion, te informamos por los canales definidos para confirmar el resultado.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">6</div>
+                    <h4>Cierre y soporte continuo</h4>
+                    <p>El caso se cierra y, si surge una nueva necesidad, puedes crear otro ticket en cualquier momento.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- STATS -->
+        <section class="stats">
+            <h2>Rendimiento y Confiabilidad</h2>
+            <div class="stats-grid">
+                <div>
+                    <div class="stat">99.99%</div>
+                    <div class="stat-label">SLA AWS Lambda</div>
+                </div>
+                <div>
+                    <div class="stat">&lt;500ms</div>
+                    <div class="stat-label">Latencia Promedio</div>
+                </div>
+                <div>
+                    <div class="stat">∞</div>
+                    <div class="stat-label">Escalabilidad</div>
+                </div>
+                <div>
+                    <div class="stat">24/7</div>
+                    <div class="stat-label">Disponibilidad</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAQ -->
+        <section class="faq" id="faq">
+            <h2>Preguntas Frecuentes</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>¿Cómo creo un ticket de soporte?</span>
+                    <span class="faq-icon">▼</span>
+                </div>
+                <div class="faq-answer">
+                    Haz clic en <strong>Crear Ticket</strong>, completa el formulario con los detalles de tu problema y envíalo. Te compartiremos un identificador para que puedas consultar su estado cuando lo necesites.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>¿Cuánto tardan en responder mi solicitud?</span>
+                    <span class="faq-icon">▼</span>
+                </div>
+                <div class="faq-answer">
+                    Nuestro equipo revisa cada ticket en el menor tiempo posible. Los casos urgentes se priorizan para darte una respuesta inicial más rápida.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>¿Puedo consultar el estado de mi ticket en línea?</span>
+                    <span class="faq-icon">▼</span>
+                </div>
+                <div class="faq-answer">
+                    Sí. Al crear el ticket recibirás un número único. Con ese código puedes entrar a <strong>Consultar Ticket</strong> y ver si está sin revisar, asignado, en proceso o resuelto.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>¿Qué información debo incluir para recibir ayuda más rápido?</span>
+                    <span class="faq-icon">▼</span>
+                </div>
+                <div class="faq-answer">
+                    Incluye una descripción clara del problema, cuándo empezó, qué intentaste y, si aplica, una captura de pantalla. Con esos datos podremos ayudarte más rápido.
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question" onclick="toggleFAQ(this)">
+                    <span>¿Necesito iniciar sesión para crear un ticket?</span>
+                    <span class="faq-icon">▼</span>
+                </div>
+                <div class="faq-answer">
+                    No. Puedes crear y enviar tu ticket sin iniciar sesión. El acceso al panel de soporte está reservado para el equipo encargado de gestionar los casos.
+                </div>
+            </div>
+        </section>
+
+        <!-- CALL TO ACTION -->
+        <section style="text-align: center; padding: 4rem 2rem; background: linear-gradient(135deg, rgba(0, 102, 255, 0.1), rgba(0, 212, 255, 0.1)); border-radius: 1rem; margin: 4rem 0;">
+            <h2 style="font-size: 2rem; margin-bottom: 1rem;">¿Listo para Comenzar?</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+                Crea tu primer ticket ahora y experimenta nuestro servicio de soporte de clase mundial.
+            </p>
+            <a href="../form/form.html" class="btn btn-primary" style="padding: 1rem 2rem; font-size: 1.1rem;">
+                📝 Crear Mi Primer Ticket
+            </a>
+            <a href="../track/track.html" class="btn btn-secondary" style="padding: 1rem 2rem; font-size: 1.1rem; margin-left: 0.75rem;">
+                🔎 Consultar Estado
+            </a>
+        </section>
+    </div>
+
+    <!-- FOOTER -->
+    <footer>
+        <p>&copy; 2026 NexaCloud. Plataforma de Soporte Técnico Serverless en AWS.</p>
+        <p>
+            Construido con <strong>AWS API Gateway</strong> + <strong>Lambdas</strong> + <strong>DynamoDB</strong> + <strong>S3</strong> | 
+            Frontend: HTML5 + CSS3 + Vanilla JS | 
+            <a href="#architecture">Arquitectura</a>
+        </p>
+    </footer>
+
+    <script>
+        async function loadNavbar() {
+            const container = document.getElementById('navbar-container');
+            if (!container) {
+                return;
+            }
+
+            try {
+                const response = await fetch('index-nav.html');
+                container.innerHTML = await response.text();
+            } catch (error) {
+                console.error('No se pudo cargar index-nav.html', error);
+            }
+        }
+
+        loadNavbar();
+
+        // Actualizar interfaz basado en estado de autenticación
+        function updateAuthUI() {
+            const isAuthenticated = cognito_isAuthenticated();
+            
+            // Actualizar botones CTA
+            const ctaButtons = document.querySelector('.cta-buttons');
+            if (ctaButtons) {
+                if (isAuthenticated) {
+                    const user = cognito_getCurrentUser();
+                    ctaButtons.innerHTML = `
+                        <a href="../support/support.html" class="btn-large primary">📊 Mi Panel de Soporte</a>
+                        <a href="../form/form.html" class="btn-large secondary">📝 Crear Ticket</a>
+                        <a href="../track/track.html" class="btn-large secondary">🔎 Consultar Ticket</a>
+                    `;
+                } else {
+                    ctaButtons.innerHTML = `
+                        <a href="../form/form.html" class="btn-large primary">📝 Crear Ticket de Soporte</a>
+                        <a href="../track/track.html" class="btn-large secondary">🔎 Consultar Ticket</a>
+                        <a href="../login/login.html" class="btn-large secondary">🔐 Panel de Soporte</a>
+                    `;
+                }
+            }
+        }
+
+        // Ejecutar cuando el documento esté listo
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', updateAuthUI);
+        } else {
+            updateAuthUI();
+        }
+
+        function toggleFAQ(element) {
+            const question = element;
+            const answer = element.nextElementSibling;
+            
+            // Cerrar todos los demás
+            document.querySelectorAll('.faq-question.active').forEach(q => {
+                if (q !== question) {
+                    q.classList.remove('active');
+                    q.nextElementSibling.classList.remove('active');
+                }
+            });
+            
+            // Toggle actual
+            question.classList.toggle('active');
+            answer.classList.toggle('active');
+        }
+
+        // Animación suave para scroll con delegación (incluye navbar cargado dinámicamente)
+        document.addEventListener('click', function(e) {
+            const anchor = e.target.closest('a[href^="#"]');
+            if (!anchor) {
+                return;
+            }
+
+            const href = anchor.getAttribute('href');
+            if (href !== '#') {
+                e.preventDefault();
+                const target = document.querySelector(href);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        });
+    </script>
+</body>
+</html>

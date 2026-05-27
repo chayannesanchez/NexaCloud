@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexaCloud - Seguimiento de Ticket</title>
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="track-style.css">
+    <script src="../api-config.js"></script>
+</head>
+<body>
+    <div id="navbar-container"></div>
+
+    <div class="container">
+        <div class="page-header">
+            <h1 class="page-title">Seguimiento de Ticket</h1>
+            <p class="page-subtitle">Consulta el avance de tu solicitud usando el número de ticket recibido al crear el reporte.</p>
+        </div>
+
+        <div class="tracking-container">
+            <div class="tracking-card">
+                <p class="tracking-helper">
+                    Ingresa tu número de ticket. Ejemplo: <strong>TKT-20260525-ABC12345</strong>. Con este código podrás ver si tu solicitud está sin revisar, asignada, en proceso o resuelta.
+                </p>
+
+                <form id="trackingForm" class="tracking-form">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="ticketIdInput">Número de ticket</label>
+                        <input id="ticketIdInput" type="text" placeholder="TKT-YYYYMMDD-XXXXXXXX" required>
+                    </div>
+                    <button id="trackButton" type="submit" class="btn btn-primary">🔎 Consultar Estado</button>
+                </form>
+
+                <div id="trackingError" class="tracking-alert error"></div>
+
+                <div id="ticketResult" class="ticket-result">
+                    <h2 class="card-title">Resultado del seguimiento</h2>
+                    <div class="ticket-summary-grid">
+                        <div class="summary-item">
+                            <div class="summary-label">Ticket</div>
+                            <div id="resultTicketId" class="summary-value">-</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Estado</div>
+                            <div class="summary-value"><span id="resultStatus" class="status-badge">-</span></div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Asunto</div>
+                            <div id="resultSubject" class="summary-value">-</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Asignado a</div>
+                            <div id="resultAssignee" class="summary-value">-</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Creado</div>
+                            <div id="resultCreatedAt" class="summary-value">-</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Última actualización</div>
+                            <div id="resultUpdatedAt" class="summary-value">-</div>
+                        </div>
+                    </div>
+
+                    <div class="tracking-timeline" aria-label="Línea de avance del ticket">
+                        <div class="timeline-step" data-step="open">
+                            <span class="timeline-icon">🕘</span>
+                            <span class="timeline-title">Sin revisar</span>
+                        </div>
+                        <div class="timeline-step" data-step="assigned">
+                            <span class="timeline-icon">👤</span>
+                            <span class="timeline-title">Asignado</span>
+                        </div>
+                        <div class="timeline-step" data-step="in-progress">
+                            <span class="timeline-icon">🛠️</span>
+                            <span class="timeline-title">En proceso</span>
+                        </div>
+                        <div class="timeline-step" data-step="resolved">
+                            <span class="timeline-icon">✅</span>
+                            <span class="timeline-title">Resuelto</span>
+                        </div>
+                    </div>
+
+                    <p class="tracking-helper">
+                        Si tu ticket aparece como resuelto pero todavía necesitas ayuda, crea un nuevo ticket y referencia este número en la descripción.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 NexaCloud. Todos los derechos reservados.</p>
+        <p>
+            <a href="../form/form.html">Crear Ticket</a> | 
+            <a href="../login/login.html">Panel de Soporte</a>
+        </p>
+    </footer>
+
+    <script>
+        async function loadNavbar() {
+            const container = document.getElementById('navbar-container');
+            if (!container) return;
+            try {
+                const response = await fetch('track-nav.html');
+                container.innerHTML = await response.text();
+            } catch (error) {
+                console.error('No se pudo cargar track-nav.html', error);
+            }
+        }
+
+        function formatStatus(value) {
+            const labels = {
+                open: 'Sin revisar',
+                assigned: 'Asignado',
+                'in-progress': 'En proceso',
+                resolved: 'Resuelto',
+                closed: 'Cerrado'
+            };
+            return labels[value] || value || 'Sin revisar';
+        }
+
+        function formatDate(value) {
+            if (!value) return '-';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return value;
+            return date.toLocaleString('es-CO', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function setText(id, value) {
+            document.getElementById(id).textContent = value || '-';
+        }
+
+        function setStatusBadge(status) {
+            const badge = document.getElementById('resultStatus');
+            badge.className = 'status-badge status-' + (status || 'open');
+            badge.textContent = formatStatus(status);
+        }
+
+        function renderTimeline(status) {
+            const order = ['open', 'assigned', 'in-progress', 'resolved'];
+            let currentStatus = status === 'closed' ? 'resolved' : (status || 'open');
+            const currentIndex = Math.max(order.indexOf(currentStatus), 0);
+
+            document.querySelectorAll('.timeline-step').forEach(step => {
+                const stepStatus = step.dataset.step;
+                const stepIndex = order.indexOf(stepStatus);
+                step.classList.remove('active', 'completed');
+                if (stepIndex < currentIndex) step.classList.add('completed');
+                if (stepIndex === currentIndex) step.classList.add('active');
+            });
+        }
+
+        function showError(message) {
+            const errorBox = document.getElementById('trackingError');
+            errorBox.textContent = message;
+            errorBox.classList.add('active');
+            document.getElementById('ticketResult').classList.remove('active');
+        }
+
+        function clearError() {
+            const errorBox = document.getElementById('trackingError');
+            errorBox.textContent = '';
+            errorBox.classList.remove('active');
+        }
+
+        function renderTicket(ticket) {
+            const status = ticket.status || 'open';
+            setText('resultTicketId', ticket.ticketId || ticket.id);
+            setStatusBadge(status);
+            setText('resultSubject', ticket.subject);
+            setText('resultAssignee', ticket.assignee || 'Sin asignar');
+            setText('resultCreatedAt', formatDate(ticket.createdAt));
+            setText('resultUpdatedAt', formatDate(ticket.updatedAt));
+            renderTimeline(status);
+            document.getElementById('ticketResult').classList.add('active');
+        }
+
+        async function handleTracking(ticketId) {
+            const cleanTicketId = String(ticketId || '').trim().toUpperCase();
+            if (!cleanTicketId) {
+                showError('Ingresa un número de ticket válido.');
+                return;
+            }
+
+            const button = document.getElementById('trackButton');
+            const originalText = button.textContent;
+            button.disabled = true;
+            button.textContent = '⏳ Consultando...';
+            clearError();
+
+            try {
+                const response = await trackTicket(cleanTicketId);
+                if (!response.success) {
+                    throw new Error(response.message || 'No fue posible consultar el ticket.');
+                }
+                renderTicket(response.ticket);
+            } catch (error) {
+                showError(error.message || 'No encontramos un ticket con ese número. Verifica el código e intenta de nuevo.');
+            } finally {
+                button.disabled = false;
+                button.textContent = originalText;
+            }
+        }
+
+        document.getElementById('trackingForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleTracking(document.getElementById('ticketIdInput').value);
+        });
+
+        loadNavbar();
+
+        const params = new URLSearchParams(window.location.search);
+        const ticketFromUrl = params.get('id');
+        if (ticketFromUrl) {
+            document.getElementById('ticketIdInput').value = ticketFromUrl;
+            handleTracking(ticketFromUrl);
+        }
+    </script>
+</body>
+</html>

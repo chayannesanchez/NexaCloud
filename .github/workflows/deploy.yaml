@@ -1,0 +1,84 @@
+name: Deploy NexaCloud Betek AWS Serverless
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      destroy:
+        description: 'Destroy infrastructure'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./terraform
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+
+      - name: Prepare Terraform build directory
+        run: mkdir -p build
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Format
+        run: terraform fmt -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan Destroy
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.destroy == 'true' }}
+        run: terraform plan -destroy -var-file=dev.tfvars -out=tfplan -input=false
+
+      - name: Terraform Destroy
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.destroy == 'true' }}
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Plan
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.destroy == 'true') }}
+        run: terraform plan -var-file=dev.tfvars -out=tfplan -input=false
+
+      - name: Terraform Apply
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.destroy == 'true') }}
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Outputs
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.destroy == 'true') }}
+        run: terraform output
+
+      - name: Show deployment URLs
+        if: ${{ !(github.event_name == 'workflow_dispatch' && github.event.inputs.destroy == 'true') }}
+        run: |
+          echo "## NexaCloud Betek deployed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Website: $(terraform output -raw website_url)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Website bucket: $(terraform output -raw website_bucket_name)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- API: $(terraform output -raw api_endpoint)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- DynamoDB table: $(terraform output -raw dynamodb_table_name)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Cognito User Pool: $(terraform output -raw cognito_user_pool_id)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Cognito Client: $(terraform output -raw cognito_client_id)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Support user: $(terraform output -raw support_admin_user)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Temporary password: configured in dev.tfvars as admin_temp_password" >> "$GITHUB_STEP_SUMMARY"
