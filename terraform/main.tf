@@ -116,12 +116,12 @@ module "lambda_create_ticket" {
   table_name       = module.dynamodb.table_name
   table_arn        = module.dynamodb.table_arn
   dynamodb_actions = ["dynamodb:PutItem"]
-  s3_bucket_arn    = aws_s3_bucket.evidence.arn
+  s3_bucket_arn   = aws_s3_bucket.evidence.arn
   extra_environment_variables = {
     EVIDENCE_BUCKET          = aws_s3_bucket.evidence.id
     EVIDENCE_PUBLIC_BASE_URL = "https://${aws_s3_bucket.evidence.bucket_regional_domain_name}"
   }
-  tags = var.tags
+  tags             = var.tags
 }
 
 module "lambda_get_tickets" {
@@ -149,22 +149,25 @@ module "lambda_update_ticket" {
   agents_table_name = module.dynamodb.agents_table_name
   agents_table_arn  = module.dynamodb.agents_table_arn
   dynamodb_actions  = ["dynamodb:UpdateItem", "dynamodb:GetItem", "dynamodb:Scan"]
-  tags              = var.tags
+  extra_environment_variables = {
+    ADMIN_EMAIL = var.admin_email
+  }
+  tags = var.tags
 }
 
 module "lambda_agents" {
-  source                = "./modules/Lambda"
-  function_name         = "${local.name_prefix}-agents"
-  source_dir            = "${path.root}/../backend/agents"
-  handler               = "app.handler"
-  runtime               = var.lambda_runtime
-  table_name            = module.dynamodb.agents_table_name
-  table_arn             = module.dynamodb.agents_table_arn
-  agents_table_name     = module.dynamodb.agents_table_name
-  agents_table_arn      = module.dynamodb.agents_table_arn
-  dynamodb_actions      = ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Scan", "dynamodb:UpdateItem", "dynamodb:DeleteItem"]
-  cognito_user_pool_arn = module.cognito.user_pool_arn
-  cognito_actions       = ["cognito-idp:AdminCreateUser", "cognito-idp:AdminSetUserPassword", "cognito-idp:AdminDeleteUser"]
+  source                 = "./modules/Lambda"
+  function_name          = "${local.name_prefix}-agents"
+  source_dir             = "${path.root}/../backend/agents"
+  handler                = "app.handler"
+  runtime                = var.lambda_runtime
+  table_name             = module.dynamodb.agents_table_name
+  table_arn              = module.dynamodb.agents_table_arn
+  agents_table_name      = module.dynamodb.agents_table_name
+  agents_table_arn       = module.dynamodb.agents_table_arn
+  dynamodb_actions       = ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Scan", "dynamodb:UpdateItem", "dynamodb:DeleteItem"]
+  cognito_user_pool_arn  = module.cognito.user_pool_arn
+  cognito_actions        = ["cognito-idp:AdminCreateUser", "cognito-idp:AdminSetUserPassword", "cognito-idp:AdminDeleteUser"]
   extra_environment_variables = {
     COGNITO_USER_POOL_ID = module.cognito.user_pool_id
     ADMIN_EMAIL          = var.admin_email

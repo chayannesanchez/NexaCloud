@@ -116,7 +116,7 @@ def handler(event, context):
         if ticket_id:
             result = table.get_item(Key={"ticketId": ticket_id})
             ticket = result.get("Item")
-            if not ticket:
+            if not ticket or ticket.get("status") == "deleted":
                 return response(404, {"success": False, "message": "Ticket no encontrado."})
 
             if is_tracking_request(event):
@@ -147,6 +147,8 @@ def handler(event, context):
 
         if status_filter:
             items = [item for item in items if item.get("status") == status_filter]
+        else:
+            items = [item for item in items if item.get("status") != "deleted"]
         if priority_filter:
             items = [item for item in items if item.get("priority") == priority_filter]
         if email_filter:

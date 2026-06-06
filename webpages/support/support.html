@@ -341,7 +341,7 @@
 
     const STATUS_LABELS = {
         open: 'ABIERTO', assigned: 'ASIGNADO', 'in-progress': 'EN PROCESO',
-        resolved: 'RESUELTO', closed: 'CERRADO',
+        resolved: 'RESUELTO', closed: 'CERRADO', deleted: 'ELIMINADO',
         low: 'Baja', medium: 'Media', high: 'Alta'
     };
     const ROLE_LABELS = { agent: 'Soporte', senior_agent: 'Soporte Senior', supervisor: 'Supervisor', admin: 'Administrador' };
@@ -370,7 +370,7 @@
     async function loadTickets(silent = false) {
         try {
             const res = await getAllTickets();
-            allTickets = res.success ? (res.tickets || []) : [];
+            allTickets = res.success ? (res.tickets || []).filter(t => t.status !== 'deleted') : [];
         } catch (err) {
             if (!silent) { console.error(err); alert('No se pudieron cargar los tickets. Verifica tu sesión.'); }
             allTickets = [];
@@ -418,6 +418,11 @@
     function canManageAgents() {
         const role = String((currentUserAccess && currentUserAccess.role) || '').toLowerCase();
         return Boolean(currentUserAccess && currentUserAccess.isAdmin) || ['admin', 'supervisor'].includes(role);
+    }
+
+    function canDeleteArchivedTickets() {
+        const role = String((currentUserAccess && currentUserAccess.role) || '').toLowerCase();
+        return role === 'admin';
     }
 
     function applyAccessControl() {
@@ -554,6 +559,7 @@
             container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🗄️</div><p>No hay tickets cerrados aún</p></div>`;
             return;
         }
+        const canDelete = canDeleteArchivedTickets();
         container.innerHTML = closed.map(ticket => {
             const tid = ticket.id || ticket.ticketId || '';
             return `<div class="ticket-row">
@@ -568,6 +574,7 @@
                 <div>${escapeHtml(formatDate(ticket.updatedAt))}</div>
                 <div class="ticket-actions">
                     <button class="btn btn-sm btn-secondary" onclick="viewTicket('${escapeHtml(tid)}')">👁️ Ver</button>
+                    ${canDelete ? `<button class="btn btn-sm" style="color:var(--color-danger,#dc2626);" onclick="deleteArchivedTicket('${escapeHtml(tid)}')">🗑️ Eliminar</button>` : ''}
                 </div>
             </div>`;
         }).join('');
@@ -681,6 +688,13 @@
                 </div>`).join('')}
                </div>` : '';
 
+        const deleteArchiveSection = isClosed && canDeleteArchivedTickets() ? `
+            <div style="margin-top:1rem; padding:1rem; border:1px solid rgba(220,38,38,0.35); border-radius:8px; background:rgba(220,38,38,0.06);">
+                <h3 style="margin-bottom:0.5rem; color:var(--color-danger,#dc2626);">🗑️ Eliminación administrativa</h3>
+                <p style="margin:0 0 0.75rem; color:var(--text-secondary); font-size:0.9rem;">Solo el administrador puede eliminar tickets que estén en Archivo.</p>
+                <button class="btn btn-sm" style="color:var(--color-danger,#dc2626);" onclick="deleteArchivedTicket('${escapeHtml(tid)}')">Eliminar ticket archivado</button>
+            </div>` : '';
+
         document.getElementById('modalContent').innerHTML = `
             <div class="detail-row"><span class="detail-label">ID:</span><span class="detail-value">${escapeHtml(tid)}</span></div>
             <div class="detail-row"><span class="detail-label">Cliente:</span><span class="detail-value">${escapeHtml(ticket.fullname)} (${escapeHtml(ticket.email)})</span></div>
@@ -712,6 +726,7 @@
             </div>
 
             ${notesHtml}
+            ${deleteArchiveSection}
         `;
     }
 
@@ -767,6 +782,29 @@
             if (updated) renderTicketModal(updated);
         } catch (err) {
             alert('❌ Error al enviar respuesta: ' + err.message);
+        }
+    }
+
+    async function deleteArchivedTicket(ticketId) {
+        if (!canDeleteArchivedTickets()) {
+            alert('Solo el administrador puede eliminar tickets archivados.');
+            return;
+        }
+        const ticket = allTickets.find(t => (t.id || t.ticketId) === ticketId);
+        if (!ticket || ticket.status !== 'closed') {
+            alert('Solo se pueden eliminar tickets que estén en Archivo.');
+            return;
+        }
+        if (!confirm(`¿Eliminar el ticket archivado "${ticketId}"? Esta acción lo ocultará del panel y conservará trazabilidad interna.`)) return;
+        try {
+            const res = await deleteTicket(ticketId, 'Eliminado desde archivo por administrador');
+            if (!res.success) throw new Error(res.message);
+            await loadTickets(true);
+            closeModal('viewModal');
+            renderArchive();
+            alert('✅ Ticket archivado eliminado correctamente.');
+        } catch (err) {
+            alert('❌ Error al eliminar ticket archivado: ' + err.message);
         }
     }
 

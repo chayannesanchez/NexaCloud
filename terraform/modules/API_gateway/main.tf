@@ -8,11 +8,11 @@ resource "aws_api_gateway_rest_api" "api" {
 }
 
 resource "aws_api_gateway_authorizer" "cognito" {
-  count           = var.enable_cognito_auth ? 1 : 0
-  name            = "nexacloud-cognito-authorizer"
-  rest_api_id     = aws_api_gateway_rest_api.api.id
-  type            = "COGNITO_USER_POOLS"
-  provider_arns   = [var.cognito_user_pool_arn]
+  count         = var.enable_cognito_auth ? 1 : 0
+  name          = "nexacloud-cognito-authorizer"
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  type          = "COGNITO_USER_POOLS"
+  provider_arns = [var.cognito_user_pool_arn]
   identity_source = "method.request.header.Authorization"
 }
 
@@ -125,6 +125,25 @@ resource "aws_api_gateway_integration" "tickets_id_get" {
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = var.lambda_tickets_get_invoke_arn
+}
+
+# DELETE /tickets/{id} - eliminación lógica de tickets archivados.
+# Endpoint administrativo: requiere Cognito y la Lambda valida rol admin.
+resource "aws_api_gateway_method" "tickets_id_delete" {
+  rest_api_id   = aws_api_gateway_rest_api.api.id
+  resource_id   = aws_api_gateway_resource.tickets_id.id
+  http_method   = "DELETE"
+  authorization = var.enable_cognito_auth ? "COGNITO_USER_POOLS" : "NONE"
+  authorizer_id = var.enable_cognito_auth ? aws_api_gateway_authorizer.cognito[0].id : null
+}
+
+resource "aws_api_gateway_integration" "tickets_id_delete" {
+  rest_api_id             = aws_api_gateway_rest_api.api.id
+  resource_id             = aws_api_gateway_resource.tickets_id.id
+  http_method             = aws_api_gateway_method.tickets_id_delete.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = var.lambda_tickets_update_invoke_arn
 }
 
 resource "aws_api_gateway_method" "tickets_track_get" {
@@ -328,7 +347,7 @@ resource "aws_api_gateway_integration_response" "tickets_id_options" {
   status_code = aws_api_gateway_method_response.tickets_id_options.status_code
 
   response_parameters = merge(local.cors_response_headers_base, {
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,DELETE,OPTIONS'"
   })
 
   depends_on = [aws_api_gateway_integration.tickets_id_options]
@@ -460,11 +479,13 @@ resource "aws_api_gateway_deployment" "deployment" {
       aws_api_gateway_method.tickets_create_post.id,
       aws_api_gateway_method.tickets_list_get.id,
       aws_api_gateway_method.tickets_id_get.id,
+      aws_api_gateway_method.tickets_id_delete.id,
       aws_api_gateway_method.tickets_track_get.id,
       aws_api_gateway_method.tickets_update_put.id,
       aws_api_gateway_integration.tickets_create_post.id,
       aws_api_gateway_integration.tickets_list_get.id,
       aws_api_gateway_integration.tickets_id_get.id,
+      aws_api_gateway_integration.tickets_id_delete.id,
       aws_api_gateway_integration.tickets_track_get.id,
       aws_api_gateway_integration.tickets_update_put.id,
       aws_api_gateway_integration_response.tickets_create_options.id,
@@ -495,6 +516,7 @@ resource "aws_api_gateway_deployment" "deployment" {
     aws_api_gateway_integration.tickets_create_post,
     aws_api_gateway_integration.tickets_list_get,
     aws_api_gateway_integration.tickets_id_get,
+    aws_api_gateway_integration.tickets_id_delete,
     aws_api_gateway_integration.tickets_track_get,
     aws_api_gateway_integration.tickets_update_put,
     aws_api_gateway_integration.tickets_reply_put,
@@ -631,10 +653,10 @@ resource "aws_api_gateway_method" "agents_options" {
 }
 
 resource "aws_api_gateway_integration" "agents_options" {
-  rest_api_id       = aws_api_gateway_rest_api.api.id
-  resource_id       = aws_api_gateway_resource.agents.id
-  http_method       = aws_api_gateway_method.agents_options.http_method
-  type              = "MOCK"
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_resource.agents.id
+  http_method = aws_api_gateway_method.agents_options.http_method
+  type        = "MOCK"
   request_templates = { "application/json" = "{\"statusCode\": 200}" }
 }
 
@@ -666,10 +688,10 @@ resource "aws_api_gateway_method" "agents_id_options" {
 }
 
 resource "aws_api_gateway_integration" "agents_id_options" {
-  rest_api_id       = aws_api_gateway_rest_api.api.id
-  resource_id       = aws_api_gateway_resource.agents_id.id
-  http_method       = aws_api_gateway_method.agents_id_options.http_method
-  type              = "MOCK"
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_resource.agents_id.id
+  http_method = aws_api_gateway_method.agents_id_options.http_method
+  type        = "MOCK"
   request_templates = { "application/json" = "{\"statusCode\": 200}" }
 }
 

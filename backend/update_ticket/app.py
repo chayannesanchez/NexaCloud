@@ -17,11 +17,14 @@ from botocore.exceptions import ClientError
 
 TABLE_NAME = os.environ["TABLE_NAME"]
 AGENTS_TABLE = os.environ.get("AGENTS_TABLE", "")
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "").strip().lower()
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(TABLE_NAME)
 
 # Flujo estricto de estados
 STATE_FLOW = ["open", "assigned", "in-progress", "resolved", "closed"]
+ARCHIVED_STATUSES = {"closed", "archived"}
+DELETED_STATUS = "deleted"
 ALLOWED_STATUS = set(STATE_FLOW)
 
 # Transiciones permitidas manualmente (asignación auto-gestiona open→assigned)
@@ -45,7 +48,7 @@ def response(status_code, body):
         "headers": {
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
-            "Access-Control-Allow-Methods": "OPTIONS,PUT",
+            "Access-Control-Allow-Methods": "OPTIONS,PUT,DELETE",
             "Content-Type": "application/json",
         },
         "body": json.dumps(body, ensure_ascii=False, cls=DecimalEncoder),
@@ -69,6 +72,34 @@ def get_claims(event):
 def get_caller_email(event):
     claims = get_claims(event)
     return str(claims.get("email") or claims.get("cognito:username") or "").strip().lower()
+
+
+def find_agent_by_email(email):
+    """Consulta el rol del usuario autenticado en la tabla de agentes."""
+    if not AGENTS_TABLE or not email:
+        return None
+    try:
+        agents_table = dynamodb.Table(AGENTS_TABLE)
+        result = agents_table.scan(
+            FilterExpression="email = :email",
+            ExpressionAttributeValues={":email": str(email).strip().lower()}
+        )
+        items = result.get("Items", [])
+        return items[0] if items else None
+    except Exception:
+        return None
+
+
+def get_caller_context(event):
+    email = get_caller_email(event)
+    agent = find_agent_by_email(email) if email else None
+    role = str((agent or {}).get("role") or ("admin" if email and email == ADMIN_EMAIL else "")).strip().lower()
+    return {
+        "email": email,
+        "role": role or None,
+        "name": (agent or {}).get("name"),
+        "isDeleteAdmin": bool(email and (email == ADMIN_EMAIL or role == "admin")),
+    }
 
 
 def update_agent_counter(agent_email, increment=True):
@@ -120,11 +151,80 @@ def handler(event, context):
     now = datetime.now(timezone.utc).isoformat()
 
     request_path = str(event.get("resource") or event.get("path") or "")
+    method = str(event.get("httpMethod") or "PUT").upper()
     is_public_reply = request_path.endswith("/reply") or "/reply" in request_path
-    caller_email = get_caller_email(event)
+    caller_context = get_caller_context(event)
+    caller_email = caller_context.get("email") or ""
 
     if not is_public_reply and not caller_email:
         return response(401, {"success": False, "message": "Sesión requerida para actualizar tickets."})
+
+    # --- ELIMINACIÓN CONTROLADA DESDE ARCHIVO ---
+    # No se elimina físicamente el registro. Se marca como deleted para conservar trazabilidad.
+    # Regla de negocio: solo rol admin puede eliminar tickets que estén en archivo/cerrados.
+    if method == "DELETE":
+        if not caller_context.get("isDeleteAdmin"):
+            return response(403, {"success": False, "message": "Solo el administrador puede eliminar tickets archivados."})
+
+        if current_status not in ARCHIVED_STATUSES:
+            return response(400, {
+                "success": False,
+                "message": "Solo se pueden eliminar tickets que estén en Archivo/Cerrados."
+            })
+
+        delete_reason = str(body.get("reason") or "Eliminado desde archivo por administrador").strip()[:500]
+        delete_entry = {
+            "from": current_status,
+            "to": DELETED_STATUS,
+            "actor": caller_email,
+            "time": now,
+            "reason": delete_reason,
+        }
+        try:
+            result = table.update_item(
+                Key={"ticketId": ticket_id},
+                UpdateExpression=(
+                    "SET #status = :deleted_status, "
+                    "#previousStatus = :previous_status, "
+                    "#deletedAt = :deleted_at, "
+                    "#deletedBy = :deleted_by, "
+                    "#deletedReason = :deleted_reason, "
+                    "#updatedAt = :updated_at, "
+                    "#stateHistory = list_append(if_not_exists(#stateHistory, :empty_history), :new_history_entry)"
+                ),
+                ExpressionAttributeNames={
+                    "#status": "status",
+                    "#previousStatus": "previousStatus",
+                    "#deletedAt": "deletedAt",
+                    "#deletedBy": "deletedBy",
+                    "#deletedReason": "deletedReason",
+                    "#updatedAt": "updatedAt",
+                    "#stateHistory": "stateHistory",
+                },
+                ExpressionAttributeValues={
+                    ":deleted_status": DELETED_STATUS,
+                    ":previous_status": current_status,
+                    ":deleted_at": now,
+                    ":deleted_by": caller_email,
+                    ":deleted_reason": delete_reason,
+                    ":updated_at": now,
+                    ":empty_history": [],
+                    ":new_history_entry": [delete_entry],
+                    ":expected_status": current_status,
+                },
+                ConditionExpression="attribute_exists(ticketId) AND #status = :expected_status",
+                ReturnValues="ALL_NEW",
+            )
+            return response(200, {
+                "success": True,
+                "message": "Ticket archivado eliminado correctamente.",
+                "ticket": result.get("Attributes")
+            })
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code")
+            if code == "ConditionalCheckFailedException":
+                return response(409, {"success": False, "message": "El ticket cambió de estado. Actualiza la vista e intenta de nuevo."})
+            return response(500, {"success": False, "message": "No se pudo eliminar el ticket archivado.", "detail": str(exc)})
 
     if is_public_reply:
         body = {

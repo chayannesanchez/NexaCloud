@@ -18,7 +18,8 @@ const API_CONFIG = {
         GET_BY_ID: '/tickets/:id',
         TRACK: '/tickets/track/:id',
         UPDATE: '/tickets/:id/update',
-        CUSTOMER_REPLY: '/tickets/:id/reply'
+        CUSTOMER_REPLY: '/tickets/:id/reply',
+        DELETE: '/tickets/:id'
     },
     AGENTS: {
         LIST: '/agents',
@@ -60,7 +61,7 @@ async function apiCall(endpoint, method = 'GET', data = null) {
             signal: controller.signal
         };
 
-        if (data && ['POST', 'PUT'].includes(method)) {
+        if (data && ['POST', 'PUT', 'DELETE'].includes(method)) {
             options.body = JSON.stringify(data);
         }
 
@@ -126,6 +127,11 @@ async function submitCustomerReply(ticketId, replyData) {
     return apiCall(API_CONFIG.TICKETS.CUSTOMER_REPLY.replace(':id', encodeURIComponent(ticketId)), 'PUT', replyData);
 }
 
+async function deleteTicket(ticketId, reason = '') {
+    const payload = reason ? { reason } : null;
+    return apiCall(API_CONFIG.TICKETS.DELETE.replace(':id', encodeURIComponent(ticketId)), 'DELETE', payload);
+}
+
 // --- AGENTES ---
 async function getAgents() {
     return apiCall(API_CONFIG.AGENTS.LIST, 'GET');
@@ -150,3 +156,4 @@ window.getTicketById = getTicketById;
 window.trackTicket = trackTicket;
 window.updateTicket = updateTicket;
 window.submitCustomerReply = submitCustomerReply;
+window.deleteTicket = deleteTicket;
