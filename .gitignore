@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+.env
+.env.*
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+terraform/build/*
+!terraform/build/.gitkeep
+
+# Terraform local secrets / private overrides
+terraform/*.tfvars
+terraform/*.auto.tfvars
+terraform/secrets/
+terraform/local/
+!terraform/environments/*.tfvars
+
+# AWS / local credentials
+.aws/
+credentials
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.zip

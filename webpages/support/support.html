@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<!-- ARCHIVO MODIFICADO -->
+<!-- support.html — implementa todos los cambios requeridos:
+     1. Botón "Nuevo Ticket" ELIMINADO
+     2. Dropdown de asignación de agente
+     3. Sección "Soportes Técnicos" en la navegación
+     4. Módulo de respuesta al cliente
+     5. Flujo de estados estricto
+     6. Vistas separadas por estado (pestañas)
+     7. Polling cada 15s para sincronización cliente↔soporte
+-->
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexaCloud - Panel de Control de Soporte Técnico</title>
+    <link rel="stylesheet" href="../style.css?v=20260529-agent-name-hover-fix">
+    <link rel="stylesheet" href="support-style.css?v=20260529-agent-name-hover-fix">
+    <script src="../api-config.js?v=20260529-agent-name-hover-fix"></script>
+    <script src="../auth-cognito.js"></script>
+    <style>
+        /* === AGENTES === */
+        .agents-section { margin-top: 2rem; }
+        .agents-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        .agents-table th, .agents-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        .agents-table th { background: var(--bg-secondary, #f8f9fa); font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+        .agent-form { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 1rem; align-items: end; margin-top: 1rem; }
+        @media (max-width: 768px) { .agent-form { grid-template-columns: 1fr; } }
+        .badge-role { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.78rem; font-weight: 600; background: var(--bg-secondary, #e9ecef); color: var(--text-secondary); }
+
+        /* === TABS DE ESTADO === */
+        .status-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+        .status-tab { padding: 0.5rem 1.1rem; border: none; border-radius: 20px; cursor: pointer; font-size: 0.85rem; font-weight: 600; background: var(--bg-secondary, #e9ecef); color: var(--text-secondary); transition: all 0.2s; }
+        .status-tab.active { background: var(--color-primary, #2563eb); color: #fff; }
+        .status-tab .tab-count { display: inline-block; background: rgba(255,255,255,0.3); border-radius: 10px; padding: 0 0.4rem; margin-left: 0.3rem; font-size: 0.78rem; }
+        .status-tab:not(.active) .tab-count { background: rgba(0,0,0,0.08); }
+
+        /* === RESPUESTAS AL CLIENTE === */
+        .replies-section { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
+        .reply-item { background: var(--bg-secondary, #f8f9fa); border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem; }
+        .reply-meta { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
+        .reply-text { font-size: 0.95rem; line-height: 1.5; white-space: pre-wrap; }
+
+        /* === HISTORIAL DE ESTADOS === */
+        .history-section { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
+        .history-item { display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.75rem; font-size: 0.88rem; }
+        .history-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--color-primary, #2563eb); margin-top: 4px; flex-shrink: 0; }
+        .history-info { line-height: 1.4; }
+        .history-time { color: var(--text-secondary); font-size: 0.8rem; }
+
+        /* === SECCIONES DINÁMICAS === */
+        .section-view { display: none; }
+        .section-view.active { display: block; }
+
+        /* === ASIGNACIÓN === */
+        .assign-row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+        .assign-select { flex: 1; min-width: 180px; }
+        .state-action-row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-top: 0.75rem; }
+
+        /* === EVIDENCIA DEL CLIENTE === */
+        .evidence-pill { display:inline-flex; align-items:center; gap:0.25rem; padding:0.25rem 0.55rem; border-radius:999px; background:#eef6ff; color:#1d4ed8; font-size:0.78rem; font-weight:700; margin-top:0.35rem; }
+        .evidence-card { margin-top:1rem; padding:1rem; background:#f8fafc; border:1px solid var(--border-color,#d9dee8); border-radius:12px; }
+        .evidence-card h3 { margin:0 0 0.75rem 0; font-size:1rem; }
+        .evidence-preview-img { display:block; max-width:100%; width:min(640px,100%); border-radius:12px; border:1px solid var(--border-color,#d9dee8); box-shadow:0 10px 24px rgba(15,23,42,0.08); }
+        .evidence-actions { display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center; margin-top:0.75rem; }
+        .evidence-meta { color:var(--text-secondary); font-size:0.82rem; margin-top:0.5rem; }
+    </style>
+
+    <style id="ui-refresh-support-overrides">
+        /* UI REFRESH - overrides cargados después de estilos embebidos */
+        .page-header { margin-bottom: 1rem !important; }
+        .page-header > div:first-child { min-width: 280px; }
+        .page-header > div:last-child { gap: 0.45rem !important; align-items: center; }
+        .status-tabs { gap: 0.45rem !important; margin-bottom: 1rem !important; }
+        .status-tab { padding: 0.48rem 0.85rem !important; border-radius: 999px !important; font-size: 0.78rem !important; }
+        .status-tab.active { background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)) !important; box-shadow: 0 8px 20px rgba(11,99,246,0.18); }
+        .agent-form { grid-template-columns: 1fr 1fr 0.9fr 0.75fr auto !important; gap: 0.7rem !important; margin-top: 0.8rem !important; }
+        .agents-section { margin-top: 1rem !important; }
+        .agents-table { border-radius: 0.85rem !important; overflow: hidden; box-shadow: var(--shadow); }
+        .agents-table th, .agents-table td { padding: 0.6rem 0.75rem !important; font-size: 0.86rem; }
+        .agents-table th { font-size: 0.7rem !important; background: #F8FAFC !important; }
+        .badge-role { border-radius: 999px !important; padding: 0.18rem 0.55rem !important; }
+        .reply-item, .history-item { font-size: 0.88rem; }
+        .reply-item { padding: 0.75rem !important; border-radius: 0.75rem !important; }
+        .evidence-card { padding: 0.85rem !important; border-radius: 0.9rem !important; }
+        .evidence-card h3 { font-size: 0.92rem !important; }
+        .evidence-preview-img { max-height: 360px; object-fit: contain; background: #fff; }
+        #modalContent { max-height: 72vh !important; }
+        @media (max-width: 1080px) { .agent-form { grid-template-columns: 1fr 1fr !important; } }
+        @media (max-width: 768px) { .agent-form { grid-template-columns: 1fr !important; } .page-header > div:last-child { width: 100%; flex-wrap: wrap; } }
+    </style>
+    <script src="../theme.js?v=20260529-theme-safe"></script>
+
+    <style id="agent-name-hover-hotfix">
+        /* HOTFIX: nombres de soporte en tickets + tabla de soportes visible en modo oscuro */
+        html[data-theme="dark"] .agents-table {
+            background: #0F1C2F !important;
+            border: 1px solid rgba(148, 163, 184, 0.28) !important;
+        }
+        html[data-theme="dark"] .agents-table thead th {
+            background: #0A1424 !important;
+            color: #DCEBFF !important;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.28) !important;
+        }
+        html[data-theme="dark"] .agents-table tbody tr,
+        html[data-theme="dark"] .agents-table tbody td {
+            background: #13233A !important;
+            color: #F4F8FF !important;
+        }
+        html[data-theme="dark"] .agents-table tbody tr:hover,
+        html[data-theme="dark"] .agents-table tbody tr:hover td {
+            background: #1D3557 !important;
+            color: #FFFFFF !important;
+        }
+        html[data-theme="dark"] .agents-table .badge-role {
+            background: rgba(96, 165, 250, 0.22) !important;
+            color: #DBEAFE !important;
+            border: 1px solid rgba(147, 197, 253, 0.42) !important;
+        }
+        html[data-theme="dark"] .agents-table .btn {
+            background: #0B1628 !important;
+            color: #FEE2E2 !important;
+            border-color: rgba(248, 113, 113, 0.35) !important;
+        }
+        .ticket-assignee {
+            font-size: 0.86rem;
+            line-height: 1.35;
+            color: var(--text-primary);
+        }
+    </style>
+
+</head>
+<body>
+    <script>
+        cognito_requireAuth('../login/login.html');
+    </script>
+
+    <div id="navbar-container"></div>
+
+    <div class="container">
+        <!-- Header con navegación de secciones -->
+        <div class="page-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+            <div>
+                <h1 class="page-title">Panel de Control — Soporte Técnico</h1>
+                <p class="page-subtitle">Gestiona todos los tickets de soporte de los clientes</p>
+                <p class="page-subtitle" id="currentUserAccess" style="font-size:0.85rem; margin-top:0.25rem;">Sesión administrativa activa</p>
+            </div>
+            <div style="display:flex; gap:0.75rem;">
+                <button class="btn btn-secondary" id="btnShowTickets" onclick="showSection('tickets')">🎫 Tickets</button>
+                <button class="btn btn-secondary" id="btnShowAgents" onclick="showSection('agents')">👥 Soportes Técnicos</button>
+                <button class="btn btn-secondary" id="btnShowArchive" onclick="showSection('archive')">🗄️ Archivo</button>
+            </div>
+        </div>
+
+        <!-- ============================
+             SECCIÓN: TICKETS
+             ============================ -->
+        <div id="section-tickets" class="section-view active">
+            <!-- Dashboard de contadores -->
+            <div class="dashboard-grid">
+                <div class="stat-card open">
+                    <div class="stat-label">Abiertos</div>
+                    <div class="stat-number" id="countOpen">0</div>
+                </div>
+                <div class="stat-card assigned">
+                    <div class="stat-label">Asignados</div>
+                    <div class="stat-number" id="countAssigned">0</div>
+                </div>
+                <div class="stat-card in-progress">
+                    <div class="stat-label">En Proceso</div>
+                    <div class="stat-number" id="countInProgress">0</div>
+                </div>
+                <div class="stat-card resolved">
+                    <div class="stat-label">Resueltos</div>
+                    <div class="stat-number" id="countResolved">0</div>
+                </div>
+                <div class="stat-card closed">
+                    <div class="stat-label">Cerrados</div>
+                    <div class="stat-number" id="countClosed">0</div>
+                </div>
+            </div>
+
+            <!-- Búsqueda y filtros -->
+            <div class="controls-section">
+                <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="searchInput" placeholder="Buscar por ID, cliente, correo, asunto, estado o soporte...">
+                </div>
+                <div class="search-actions">
+                    <button type="button" class="btn btn-primary btn-sm" id="searchButton">🔍 Buscar</button>
+                    <button type="button" class="btn btn-secondary btn-sm" id="clearSearchButton">Limpiar</button>
+                </div>
+                <div class="filter-group priority-filter">
+                    <select id="filterPriority" style="min-width: 170px;">
+                        <option value="">Todas las Prioridades</option>
+                        <option value="low">Baja</option>
+                        <option value="medium">Media</option>
+                        <option value="high">Alta</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Pestañas de estado -->
+            <div class="status-tabs">
+                <button class="status-tab active" data-status="open" onclick="switchStatusTab('open', this)">
+                    🕘 Abiertos <span class="tab-count" id="tab-count-open">0</span>
+                </button>
+                <button class="status-tab" data-status="assigned" onclick="switchStatusTab('assigned', this)">
+                    👤 Asignados <span class="tab-count" id="tab-count-assigned">0</span>
+                </button>
+                <button class="status-tab" data-status="in-progress" onclick="switchStatusTab('in-progress', this)">
+                    🛠️ En Proceso <span class="tab-count" id="tab-count-in-progress">0</span>
+                </button>
+                <button class="status-tab" data-status="resolved" onclick="switchStatusTab('resolved', this)">
+                    ✅ Resueltos <span class="tab-count" id="tab-count-resolved">0</span>
+                </button>
+                <button class="status-tab" data-status="all" onclick="switchStatusTab('all', this)">
+                    📋 Todos
+                </button>
+            </div>
+
+            <div id="ticketsContainer">
+                <div class="empty-state">
+                    <div class="empty-state-icon">📋</div>
+                    <p>Cargando tickets...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================
+             SECCIÓN: AGENTES
+             ============================ -->
+        <div id="section-agents" class="section-view">
+            <div class="card" style="margin-top:1.5rem;">
+                <h2 class="card-title" style="margin-bottom:1.5rem;">👥 Soportes Técnicos</h2>
+
+                <!-- Formulario nuevo agente -->
+                <h3 style="font-size:1rem; margin-bottom:0.75rem; color:var(--text-secondary);">Registrar nuevo soporte técnico</h3>
+                <div class="agent-form">
+                    <div class="form-group" style="margin:0;">
+                        <label>Nombre completo</label>
+                        <input type="text" id="agentName" placeholder="Ej: Ana García">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label>Correo electrónico</label>
+                        <input type="email" id="agentEmail" placeholder="soporte@empresa.com">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label>Clave de acceso</label>
+                        <input type="password" id="agentPassword" placeholder="Mín. 8 caracteres, mayúscula, número y símbolo" autocomplete="new-password">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label>Rol</label>
+                        <select id="agentRole">
+                            <option value="agent">Soporte</option>
+                            <option value="senior_agent">Soporte Senior</option>
+                            <option value="supervisor">Supervisor</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="registerAgent()">➕ Registrar</button>
+                </div>
+
+                <!-- Lista de agentes -->
+                <div id="agentsTableContainer" style="margin-top:2rem;">
+                    <p style="color:var(--text-secondary);">Cargando agentes...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================
+             SECCIÓN: ARCHIVO (CERRADOS)
+             ============================ -->
+        <div id="section-archive" class="section-view">
+            <div style="margin-top:1.5rem;">
+                <h2 class="card-title" style="margin-bottom:1rem;">🗄️ Archivo — Tickets Cerrados</h2>
+                <p style="color:var(--text-secondary); margin-bottom:1.5rem;">
+                    Los tickets cerrados se almacenan aquí automáticamente y no aparecen en las vistas principales.
+                </p>
+                <div id="archiveContainer">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🗄️</div>
+                        <p>No hay tickets cerrados aún</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================
+         MODAL: VER TICKET DETALLE
+         ============================ -->
+    <div class="modal-overlay" id="viewModal">
+        <div class="modal modal-large">
+            <div class="modal-header">
+                <h2 class="card-title">Detalles del Ticket</h2>
+                <button class="modal-close" onclick="closeModal('viewModal')">×</button>
+            </div>
+            <div id="modalContent" style="max-height: 70vh; overflow-y: auto;"></div>
+            <div style="display:flex; gap:1rem; margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--border-color);">
+                <button class="btn btn-secondary" onclick="closeModal('viewModal')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 NexaCloud. Todos los derechos reservados.</p>
+        <p>Panel de Control de Soporte Técnico | Versión 2.0</p>
+    </footer>
+
+    <script>
+    // ================================================================
+    // ESTADO GLOBAL
+    // ================================================================
+    let allTickets = [];
+    let allAgents = [];
+    let currentStatusFilter = 'open';
+    let currentTicketId = null;
+    let pollingTimer = null;
+    let currentUserAccess = { role: null, email: null, isAdmin: false };
+
+    // ================================================================
+    // INICIALIZACIÓN
+    // ================================================================
+    async function loadNavbar() {
+        const container = document.getElementById('navbar-container');
+        if (!container) return;
+        try {
+            const res = await fetch('support-nav.html');
+            container.innerHTML = await res.text();
+            if (window.applySavedTheme) window.applySavedTheme();
+            const logoutLink = document.getElementById('logoutLink');
+            if (logoutLink) logoutLink.addEventListener('click', e => { e.preventDefault(); cognito_logout(true); });
+        } catch (err) { console.error('No se pudo cargar support-nav.html', err); }
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
+            .replaceAll('"','&quot;').replaceAll("'",'&#039;');
+    }
+
+    const STATUS_LABELS = {
+        open: 'ABIERTO', assigned: 'ASIGNADO', 'in-progress': 'EN PROCESO',
+        resolved: 'RESUELTO', closed: 'CERRADO',
+        low: 'Baja', medium: 'Media', high: 'Alta'
+    };
+    const ROLE_LABELS = { agent: 'Soporte', senior_agent: 'Soporte Senior', supervisor: 'Supervisor', admin: 'Administrador' };
+
+    function formatLabel(v) { return STATUS_LABELS[v] || v || 'N/A'; }
+    function formatDate(v) {
+        if (!v) return '-';
+        const d = new Date(v);
+        return isNaN(d.getTime()) ? v : d.toLocaleString('es-CO', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+    }
+
+    // ================================================================
+    // NAVEGACIÓN DE SECCIONES
+    // ================================================================
+    function showSection(name) {
+        ['tickets','agents','archive'].forEach(s => {
+            document.getElementById('section-' + s).classList.toggle('active', s === name);
+        });
+        if (name === 'agents') loadAgents();
+        if (name === 'archive') renderArchive();
+    }
+
+    // ================================================================
+    // CARGA DE DATOS + POLLING
+    // ================================================================
+    async function loadTickets(silent = false) {
+        try {
+            const res = await getAllTickets();
+            allTickets = res.success ? (res.tickets || []) : [];
+        } catch (err) {
+            if (!silent) { console.error(err); alert('No se pudieron cargar los tickets. Verifica tu sesión.'); }
+            allTickets = [];
+        }
+        updateDashboard();
+        renderTickets();
+        renderArchive();
+    }
+
+    async function loadAgents() {
+        try {
+            const res = await getAgents();
+            allAgents = res.success ? (res.agents || []) : [];
+            currentUserAccess = res.currentUser || resolveCurrentUserAccess();
+        } catch (err) {
+            allAgents = [];
+            currentUserAccess = resolveCurrentUserAccess();
+        }
+        applyAccessControl();
+        renderAgentsTable();
+        renderTickets();
+        renderArchive();
+    }
+
+    function startPolling() {
+        if (pollingTimer) clearInterval(pollingTimer);
+        pollingTimer = setInterval(() => loadTickets(true), 15000);
+    }
+
+    // ================================================================
+    // CONTROL DE ACCESO DEL PANEL
+    // ================================================================
+    function resolveCurrentUserAccess() {
+        const email = String(cognito_getCurrentUser() || '').trim().toLowerCase();
+        const agent = allAgents.find(a => String(a.email || '').trim().toLowerCase() === email);
+        const role = agent ? agent.role : null;
+        return {
+            email,
+            role,
+            name: agent ? agent.name : null,
+            isAdmin: ['admin', 'supervisor'].includes(String(role || '').toLowerCase())
+        };
+    }
+
+    function canManageAgents() {
+        const role = String((currentUserAccess && currentUserAccess.role) || '').toLowerCase();
+        return Boolean(currentUserAccess && currentUserAccess.isAdmin) || ['admin', 'supervisor'].includes(role);
+    }
+
+    function applyAccessControl() {
+        if (!currentUserAccess || !currentUserAccess.email) {
+            currentUserAccess = resolveCurrentUserAccess();
+        }
+        const roleLabel = ROLE_LABELS[currentUserAccess.role] || 'Soporte autenticado';
+        const accessEl = document.getElementById('currentUserAccess');
+        if (accessEl) {
+            accessEl.textContent = `Usuario: ${currentUserAccess.email || cognito_getCurrentUser() || 'sesión activa'} · Rol: ${roleLabel}`;
+        }
+        const agentForm = document.querySelector('.agent-form');
+        const agentFormTitle = agentForm ? agentForm.previousElementSibling : null;
+        const canManage = canManageAgents();
+        if (agentForm) agentForm.style.display = canManage ? 'grid' : 'none';
+        if (agentFormTitle) {
+            agentFormTitle.textContent = canManage
+                ? 'Registrar nuevo soporte técnico'
+                : 'Gestión restringida: solo administrador o supervisor puede crear soportes';
+        }
+    }
+
+    // ================================================================
+    // DASHBOARD
+    // ================================================================
+    function updateDashboard() {
+        const counts = { open:0, assigned:0, 'in-progress':0, resolved:0, closed:0 };
+        allTickets.forEach(t => { if (counts[t.status] !== undefined) counts[t.status]++; });
+        document.getElementById('countOpen').textContent = counts['open'];
+        document.getElementById('countAssigned').textContent = counts['assigned'];
+        document.getElementById('countInProgress').textContent = counts['in-progress'];
+        document.getElementById('countResolved').textContent = counts['resolved'];
+        const closedEl = document.getElementById('countClosed');
+        if (closedEl) closedEl.textContent = counts['closed'];
+        // Actualizar conteos en pestañas
+        ['open','assigned','in-progress','resolved'].forEach(s => {
+            const el = document.getElementById('tab-count-' + s);
+            if (el) el.textContent = counts[s];
+        });
+    }
+
+    // ================================================================
+    // RENDERIZADO DE TICKETS
+    // ================================================================
+    function getFilteredTickets() {
+        const searchInput = document.getElementById('searchInput');
+        const prioritySelect = document.getElementById('filterPriority');
+        const search = searchInput ? searchInput.value.toLowerCase().trim() : '';
+        const priority = prioritySelect ? prioritySelect.value : '';
+
+        // Excluir siempre 'closed' de la vista principal. Los cerrados viven en Archivo.
+        let filtered = allTickets.filter(t => t.status !== 'closed');
+
+        // Cuando hay búsqueda, se busca en todos los estados activos para que el usuario encuentre el ticket aunque esté en otra pestaña.
+        if (!search && currentStatusFilter !== 'all') {
+            filtered = filtered.filter(t => t.status === currentStatusFilter);
+        }
+
+        if (search) {
+            filtered = filtered.filter(t => {
+                const replies = Array.isArray(t.customerReplies) ? t.customerReplies : [];
+                const text = [
+                    t.id, t.ticketId, t.fullname, t.email, t.phone, t.subject, t.description,
+                    t.category, t.priority, t.status, t.assignee, t.assigneeEmail, t.assigneeName, t.agentName,
+                    ...replies.map(r => `${r.author || ''} ${r.authorType || ''} ${r.text || ''}`)
+                ].map(v => String(v || '').toLowerCase()).join(' ');
+                return text.includes(search);
+            });
+        }
+
+        if (priority) filtered = filtered.filter(t => t.priority === priority);
+        return filtered;
+    }
+
+
+    function findAgentByEmail(email) {
+        const normalized = String(email || '').trim().toLowerCase();
+        if (!normalized) return null;
+        return allAgents.find(a => String(a.email || '').trim().toLowerCase() === normalized) || null;
+    }
+
+    function formatAssignee(ticket) {
+        const email = ticket.assigneeEmail || ticket.assignee || '';
+        const agent = findAgentByEmail(email);
+        const name = ticket.assigneeName || ticket.agentName || ticket.supportName || (agent ? agent.name : '');
+        if (name && email) return `${name} (${email})`;
+        if (name) return name;
+        if (email) return email;
+        return 'Sin asignar';
+    }
+
+    function renderTickets() {
+        const container = document.getElementById('ticketsContainer');
+        const filtered = getFilteredTickets();
+        if (filtered.length === 0) {
+            container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔍</div>
+                <p>No hay tickets en esta vista</p></div>`;
+            return;
+        }
+        container.innerHTML = filtered.map(ticket => {
+            const tid = ticket.id || ticket.ticketId || '';
+            return `<div class="ticket-row">
+                <div class="ticket-id">${escapeHtml(tid)}</div>
+                <div class="ticket-subject">
+                    <div>${escapeHtml(ticket.subject)}</div>
+                    <div class="ticket-customer">${escapeHtml(ticket.fullname)}</div>
+                    ${ticket.evidenceImage && ticket.evidenceImage.url ? '<div class="evidence-pill">🖼️ Con evidencia</div>' : ''}
+                </div>
+                <div><span class="priority-indicator priority-${escapeHtml(ticket.priority)}"></span>${escapeHtml(formatLabel(ticket.priority))}</div>
+                <div><span class="status-badge status-${escapeHtml(ticket.status||'')}">${escapeHtml(formatLabel(ticket.status))}</span></div>
+                <div class="ticket-assignee">${formatAssignee(ticket) === 'Sin asignar' ? '<em style="color:var(--text-secondary);">Sin asignar</em>' : escapeHtml(formatAssignee(ticket))}</div>
+                <div class="ticket-actions">
+                    <button class="btn btn-sm btn-primary" onclick="viewTicket('${escapeHtml(tid)}')">👁️ Ver</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function switchStatusTab(status, el) {
+        currentStatusFilter = status;
+        document.querySelectorAll('.status-tab').forEach(t => t.classList.remove('active'));
+        if (el) el.classList.add('active');
+        renderTickets();
+    }
+
+    // ================================================================
+    // ARCHIVO (CERRADOS)
+    // ================================================================
+    function renderArchive() {
+        const container = document.getElementById('archiveContainer');
+        if (!container) return;
+        const closed = allTickets.filter(t => t.status === 'closed');
+        if (closed.length === 0) {
+            container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🗄️</div><p>No hay tickets cerrados aún</p></div>`;
+            return;
+        }
+        container.innerHTML = closed.map(ticket => {
+            const tid = ticket.id || ticket.ticketId || '';
+            return `<div class="ticket-row">
+                <div class="ticket-id">${escapeHtml(tid)}</div>
+                <div class="ticket-subject">
+                    <div>${escapeHtml(ticket.subject)}</div>
+                    <div class="ticket-customer">${escapeHtml(ticket.fullname)}</div>
+                    ${ticket.evidenceImage && ticket.evidenceImage.url ? '<div class="evidence-pill">🖼️ Con evidencia</div>' : ''}
+                </div>
+                <div><span class="status-badge status-closed">CERRADO</span></div>
+                <div>${escapeHtml(formatAssignee(ticket) === 'Sin asignar' ? '-' : formatAssignee(ticket))}</div>
+                <div>${escapeHtml(formatDate(ticket.updatedAt))}</div>
+                <div class="ticket-actions">
+                    <button class="btn btn-sm btn-secondary" onclick="viewTicket('${escapeHtml(tid)}')">👁️ Ver</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // ================================================================
+    // VER TICKET DETALLE
+    // ================================================================
+    function viewTicket(ticketId) {
+        currentTicketId = ticketId;
+        const ticket = allTickets.find(t => (t.id || t.ticketId) === ticketId);
+        if (!ticket) return;
+        renderTicketModal(ticket);
+        document.getElementById('viewModal').classList.add('active');
+    }
+
+    function renderTicketModal(ticket) {
+        const tid = ticket.id || ticket.ticketId || '';
+        const status = ticket.status || 'open';
+        const isClosed = status === 'closed';
+
+        // Soportes disponibles para el dropdown
+        const agentOptions = allAgents.map(a =>
+            `<option value="${escapeHtml(a.email)}" ${(ticket.assigneeEmail || ticket.assignee) === a.email ? 'selected' : ''}>${escapeHtml(a.name)} (${escapeHtml(a.email)})</option>`
+        ).join('');
+
+        // Estado siguiente permitido
+        const nextStates = { assigned: 'in-progress', 'in-progress': 'resolved', resolved: 'closed' };
+        const nextStateLabels = { 'in-progress': '🛠️ Marcar En Proceso', resolved: '✅ Marcar Resuelto', closed: '🔒 Cerrar Ticket' };
+        const nextState = nextStates[status];
+
+        // Sección asignación
+        const assignSection = !isClosed ? `
+            <div style="margin-top:1rem; padding:1rem; background:var(--bg-secondary,#f8f9fa); border-radius:8px;">
+                <strong>Asignar soporte técnico:</strong>
+                <div class="assign-row" style="margin-top:0.5rem;">
+                    <select id="assignAgentSelect" class="assign-select">
+                        <option value="">— Sin asignar —</option>
+                        ${agentOptions}
+                    </select>
+                    <button class="btn btn-primary btn-sm" onclick="assignAgent('${escapeHtml(tid)}')">💾 Asignar</button>
+                </div>
+                ${nextState ? `<div class="state-action-row">
+                    <button class="btn btn-secondary btn-sm" onclick="advanceState('${escapeHtml(tid)}', '${nextState}')">
+                        ${nextStateLabels[nextState]}
+                    </button>
+                </div>` : ''}
+            </div>` : '';
+
+        // Respuestas al cliente
+        const replies = Array.isArray(ticket.customerReplies) ? [...ticket.customerReplies].sort((a, b) => new Date(a.time || 0) - new Date(b.time || 0)) : [];
+        const repliesHtml = replies.length > 0
+            ? replies.map(r => {
+                const isClient = r.authorType === 'client';
+                const solvedLabel = r.problemSolved === 'yes' ? ' · ✅ solucionado' : r.problemSolved === 'no' ? ' · ❌ no solucionado' : r.problemSolved === 'partial' ? ' · ⚠️ parcial' : '';
+                return `<div class="reply-item">
+                    <div class="reply-meta"><span>${isClient ? '🙋 Cliente' : '👤 Soporte'}: ${escapeHtml(r.author || '')}${solvedLabel}</span><span>${escapeHtml(formatDate(r.time))}</span></div>
+                    <div class="reply-text">${escapeHtml(r.text)}</div>
+                </div>`;
+              }).join('')
+            : '<p style="color:var(--text-secondary); font-size:0.9rem;">Aún no hay conversación registrada.</p>';
+
+        const replyForm = !isClosed ? `
+            <textarea id="replyText" rows="3" placeholder="Escribe la respuesta para el cliente..." style="width:100%; margin-top:0.75rem; resize:vertical;"></textarea>
+            <button class="btn btn-primary btn-sm" style="margin-top:0.5rem;" onclick="sendReply('${escapeHtml(tid)}')">📨 Enviar respuesta</button>
+        ` : '';
+
+        // Historial de estados
+        const history = Array.isArray(ticket.stateHistory) ? [...ticket.stateHistory].sort((a, b) => new Date(a.time || 0) - new Date(b.time || 0)) : [];
+        const historyHtml = history.length > 0
+            ? history.map(h => `<div class="history-item">
+                <div class="history-dot"></div>
+                <div class="history-info">
+                    <span><strong>${escapeHtml(h.from)}</strong> → <strong>${escapeHtml(h.to)}</strong></span>
+                    <span style="color:var(--text-secondary);"> por ${escapeHtml(h.actor)}</span>
+                    <div class="history-time">${escapeHtml(formatDate(h.time))}</div>
+                </div>
+              </div>`).join('')
+            : '<p style="color:var(--text-secondary); font-size:0.9rem;">Sin cambios de estado registrados.</p>';
+
+
+        const evidence = ticket.evidenceImage || ticket.evidence || ticket.attachmentImage || null;
+        const evidenceUrl = evidence && evidence.url ? evidence.url : '';
+        const evidenceName = evidence && evidence.name ? evidence.name : 'Imagen enviada por el cliente';
+        const evidenceSize = evidence && evidence.size ? `${Math.round(Number(evidence.size) / 1024)} KB` : '';
+        const evidenceHtml = evidenceUrl ? `
+            <div class="evidence-card">
+                <h3>🖼️ Evidencia enviada por el cliente</h3>
+                <a href="${escapeHtml(evidenceUrl)}" target="_blank" rel="noopener" title="Abrir imagen completa">
+                    <img class="evidence-preview-img" src="${escapeHtml(evidenceUrl)}" alt="Evidencia del problema enviada por el cliente">
+                </a>
+                <div class="evidence-actions">
+                    <a class="btn btn-primary btn-sm" href="${escapeHtml(evidenceUrl)}" target="_blank" rel="noopener">🔍 Abrir imagen completa</a>
+                    <a class="btn btn-secondary btn-sm" href="${escapeHtml(evidenceUrl)}" download>⬇️ Descargar evidencia</a>
+                </div>
+                <div class="evidence-meta">${escapeHtml(evidenceName)}${evidenceSize ? ' · ' + escapeHtml(evidenceSize) : ''}</div>
+            </div>` : `
+            <div class="evidence-card">
+                <h3>🖼️ Evidencia enviada por el cliente</h3>
+                <p style="color:var(--text-secondary); margin:0;">Este ticket no tiene imagen de evidencia cargada.</p>
+            </div>`;
+
+        // Notas internas
+        const notes = Array.isArray(ticket.notes) ? ticket.notes : [];
+        const notesHtml = notes.length > 0
+            ? `<div class="notes-section" style="margin-top:1.5rem; padding-top:1.5rem; border-top:1px solid var(--border-color);">
+                <h3 style="margin-bottom:1rem;">📝 Notas Internas</h3>
+                ${notes.map(n => `<div class="note">
+                    <div class="note-header"><span class="note-author">${escapeHtml(n.author)}</span><span class="note-time">${escapeHtml(n.time)}</span></div>
+                    <p style="margin:0;">${escapeHtml(n.text)}</p>
+                </div>`).join('')}
+               </div>` : '';
+
+        document.getElementById('modalContent').innerHTML = `
+            <div class="detail-row"><span class="detail-label">ID:</span><span class="detail-value">${escapeHtml(tid)}</span></div>
+            <div class="detail-row"><span class="detail-label">Cliente:</span><span class="detail-value">${escapeHtml(ticket.fullname)} (${escapeHtml(ticket.email)})</span></div>
+            <div class="detail-row"><span class="detail-label">Teléfono:</span><span class="detail-value">${escapeHtml(ticket.phone || 'N/A')}</span></div>
+            <div class="detail-row"><span class="detail-label">Categoría:</span><span class="detail-value">${escapeHtml(ticket.category || '-')}</span></div>
+            <div class="detail-row"><span class="detail-label">Prioridad:</span><span class="detail-value">
+                <span class="priority-indicator priority-${escapeHtml(ticket.priority)}"></span>${escapeHtml(formatLabel(ticket.priority))}
+            </span></div>
+            <div class="detail-row"><span class="detail-label">Estado:</span><span class="detail-value">
+                <span class="status-badge status-${escapeHtml(status)}">${escapeHtml(formatLabel(status))}</span>
+            </span></div>
+            <div class="detail-row"><span class="detail-label">Asignado a:</span><span class="detail-value">${escapeHtml(formatAssignee(ticket))}</span></div>
+            <div class="detail-row"><span class="detail-label">Creado:</span><span class="detail-value">${escapeHtml(formatDate(ticket.createdAt))}</span></div>
+            <div class="detail-row"><span class="detail-label">Asunto:</span><span class="detail-value">${escapeHtml(ticket.subject)}</span></div>
+            <div class="detail-row"><span class="detail-label">Descripción:</span><span class="detail-value">${escapeHtml(ticket.description)}</span></div>
+            ${evidenceHtml}
+
+            ${assignSection}
+
+            <div class="replies-section">
+                <h3 style="margin-bottom:1rem;">💬 Conversación con el Cliente</h3>
+                ${repliesHtml}
+                ${replyForm}
+            </div>
+
+            <div class="history-section">
+                <h3 style="margin-bottom:1rem;">📊 Historial de Estados</h3>
+                ${historyHtml}
+            </div>
+
+            ${notesHtml}
+        `;
+    }
+
+    // ================================================================
+    // ACCIONES DEL AGENTE
+    // ================================================================
+    async function assignAgent(ticketId) {
+        const select = document.getElementById('assignAgentSelect');
+        if (!select) return;
+        const agentEmail = select.value;
+        const selectedAgent = allAgents.find(a => a.email === agentEmail);
+        const actor = cognito_getCurrentUser() || 'Support Team';
+        try {
+            const res = await updateTicket(ticketId, {
+                assignee: agentEmail || null,
+                assigneeEmail: agentEmail || null,
+                assigneeName: selectedAgent ? selectedAgent.name : null,
+                actor
+            });
+            if (!res.success) throw new Error(res.message);
+            await loadTickets(true);
+            const updated = allTickets.find(t => (t.id || t.ticketId) === ticketId);
+            if (updated) renderTicketModal(updated);
+        } catch (err) {
+            alert('❌ Error al asignar: ' + err.message);
+        }
+    }
+
+    async function advanceState(ticketId, newStatus) {
+        const actor = cognito_getCurrentUser() || 'Support Team';
+        if (!confirm(`¿Cambiar estado a "${formatLabel(newStatus)}"?`)) return;
+        try {
+            const res = await updateTicket(ticketId, { status: newStatus, actor });
+            if (!res.success) throw new Error(res.message);
+            await loadTickets(true);
+            const updated = allTickets.find(t => (t.id || t.ticketId) === ticketId);
+            if (updated) renderTicketModal(updated);
+            else closeModal('viewModal');
+        } catch (err) {
+            alert('❌ Error al cambiar estado: ' + err.message);
+        }
+    }
+
+    async function sendReply(ticketId) {
+        const textarea = document.getElementById('replyText');
+        if (!textarea || !textarea.value.trim()) { alert('Escribe una respuesta antes de enviar.'); return; }
+        const actor = cognito_getCurrentUser() || 'Support Team';
+        try {
+            const res = await updateTicket(ticketId, { customerReply: textarea.value.trim(), actor });
+            if (!res.success) throw new Error(res.message);
+            await loadTickets(true);
+            const updated = allTickets.find(t => (t.id || t.ticketId) === ticketId);
+            if (updated) renderTicketModal(updated);
+        } catch (err) {
+            alert('❌ Error al enviar respuesta: ' + err.message);
+        }
+    }
+
+    // ================================================================
+    // AGENTES
+    // ================================================================
+    async function registerAgent() {
+        if (!canManageAgents()) { alert('No tienes permisos para registrar soportes técnicos.'); return; }
+        const name = document.getElementById('agentName').value.trim();
+        const email = document.getElementById('agentEmail').value.trim();
+        const role = document.getElementById('agentRole').value;
+        const password = document.getElementById('agentPassword').value;
+        if (!name || !email || !password) { alert('Nombre, email y clave son obligatorios.'); return; }
+        if (password.length < 8) { alert('La clave debe tener mínimo 8 caracteres.'); return; }
+        try {
+            const res = await createAgent({ name, email, role, password });
+            if (!res.success) throw new Error(res.message);
+            document.getElementById('agentName').value = '';
+            document.getElementById('agentEmail').value = '';
+            document.getElementById('agentPassword').value = '';
+            await loadAgents();
+            alert('✅ Soporte registrado: ' + name);
+        } catch (err) {
+            alert('❌ Error al registrar: ' + err.message);
+        }
+    }
+
+    function renderAgentsTable() {
+        const container = document.getElementById('agentsTableContainer');
+        const canManage = canManageAgents();
+        if (allAgents.length === 0) {
+            container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">👥</div><p>No hay soportes técnicos registrados aún</p></div>`;
+            return;
+        }
+        container.innerHTML = `<table class="agents-table">
+            <thead><tr>
+                <th>Nombre</th><th>Email</th><th>Rol</th><th>Tickets asignados</th><th></th>
+            </tr></thead>
+            <tbody>${allAgents.map(a => `<tr>
+                <td>${escapeHtml(a.name)}</td>
+                <td>${escapeHtml(a.email)}</td>
+                <td><span class="badge-role">${escapeHtml(ROLE_LABELS[a.role] || a.role)}</span></td>
+                <td>${a.assignedTickets || 0}</td>
+                <td>${canManage ? `<button class="btn btn-sm" style="color:var(--color-danger,#dc2626);" onclick="removeAgent('${escapeHtml(a.agentId)}','${escapeHtml(a.name)}')">🗑️</button>` : '<span style="color:var(--text-secondary); font-size:0.8rem;">Solo lectura</span>'}</td>
+            </tr>`).join('')}</tbody>
+        </table>`;
+    }
+
+    async function removeAgent(agentId, name) {
+        if (!canManageAgents()) { alert('No tienes permisos para eliminar soportes técnicos.'); return; }
+        if (!confirm(`¿Eliminar al agente "${name}"?`)) return;
+        try {
+            const res = await deleteAgent(agentId);
+            if (!res.success) throw new Error(res.message);
+            await loadAgents();
+        } catch (err) {
+            alert('❌ Error: ' + err.message);
+        }
+    }
+
+    // ================================================================
+    // UTILIDADES
+    // ================================================================
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', function(e) {
+            if (e.target === this) this.classList.remove('active');
+        });
+    });
+
+    const searchInputEl = document.getElementById('searchInput');
+    const searchButtonEl = document.getElementById('searchButton');
+    const clearSearchButtonEl = document.getElementById('clearSearchButton');
+    const filterPriorityEl = document.getElementById('filterPriority');
+
+    if (searchInputEl) {
+        searchInputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') renderTickets();
+        });
+    }
+    if (searchButtonEl) searchButtonEl.addEventListener('click', renderTickets);
+    if (clearSearchButtonEl) {
+        clearSearchButtonEl.addEventListener('click', () => {
+            if (searchInputEl) searchInputEl.value = '';
+            if (filterPriorityEl) filterPriorityEl.value = '';
+            renderTickets();
+        });
+    }
+    if (filterPriorityEl) filterPriorityEl.addEventListener('change', renderTickets);
+
+    // ================================================================
+    // ARRANQUE
+    // ================================================================
+    loadNavbar();
+    loadTickets();
+    loadAgents();   // Pre-cargar agentes para el dropdown
+    startPolling(); // Sincronización automática cada 15s
+    </script>
+</body>
+</html>

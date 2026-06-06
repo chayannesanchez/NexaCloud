@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<!-- ARCHIVO MODIFICADO -->
+<!-- track.html — extiende el portal del cliente para mostrar:
+     - Agente asignado
+     - Estado actual actualizado
+     - Historial de cambios de estado
+     - Respuestas del equipo de soporte
+     - Polling cada 20s para sincronización en tiempo real
+-->
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexaCloud - Seguimiento de Ticket</title>
+    <link rel="stylesheet" href="../style.css?v=20260529-support-search-assignee-fix">
+    <link rel="stylesheet" href="track-style.css?v=20260529-support-search-assignee-fix">
+    <script src="../api-config.js?v=20260527-agent-login-chat-lock"></script>
+    <style>
+        .replies-container { margin-top: 1.5rem; }
+        .reply-card { background: var(--bg-secondary, #f8f9fa); border-left: 4px solid var(--color-primary, #2563eb); border-radius: 6px; padding: 1rem 1.2rem; margin-bottom: 0.9rem; }
+        .reply-meta { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
+        .reply-text { font-size: 0.95rem; line-height: 1.6; white-space: pre-wrap; }
+        .section-title { font-size: 1rem; font-weight: 700; margin: 1.5rem 0 0.75rem; color: var(--text-primary, #111); }
+        .assignee-badge { display: inline-flex; align-items: center; gap: 0.4rem; background: var(--bg-secondary, #e9ecef); border-radius: 20px; padding: 0.25rem 0.75rem; font-size: 0.88rem; }
+        .live-indicator { display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; margin-right: 0.4rem; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .state-history-list { list-style: none; padding: 0; margin: 0; }
+        .state-history-list li { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color); font-size: 0.88rem; }
+        .state-history-list li:last-child { border-bottom: none; }
+        .sh-arrow { color: var(--text-secondary); }
+    </style>
+    <script src="../theme.js?v=20260529-theme-safe"></script>
+</head>
+<body>
+    <div id="navbar-container"></div>
+
+    <div class="container">
+        <div class="page-header">
+            <h1 class="page-title">Seguimiento de Ticket</h1>
+            <p class="page-subtitle">Consulta el avance de tu solicitud usando el número de ticket recibido al crear el reporte.</p>
+        </div>
+
+        <div class="tracking-container">
+            <div class="tracking-card">
+                <p class="tracking-helper">
+                    Ingresa tu número de ticket. Ejemplo: <strong>TKT-20260525-ABC12345</strong>.
+                </p>
+
+                <form id="trackingForm" class="tracking-form">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label for="ticketIdInput">Número de ticket</label>
+                        <input id="ticketIdInput" type="text" placeholder="TKT-YYYYMMDD-XXXXXXXX" required>
+                    </div>
+                    <button id="trackButton" type="submit" class="btn btn-primary">🔎 Consultar Estado</button>
+                </form>
+
+                <div id="trackingError" class="tracking-alert error"></div>
+
+                <div id="ticketResult" class="ticket-result">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                        <h2 class="card-title" style="margin:0;">Resultado del seguimiento</h2>
+                        <span title="Actualización automática cada 20 segundos" style="font-size:0.8rem; color:var(--text-secondary);">
+                            <span class="live-indicator"></span>En vivo
+                        </span>
+                    </div>
+
+                    <div class="ticket-summary-grid">
+                        <div class="summary-item">
+                            <div class="summary-label">Ticket</div>
+                            <div id="resultTicketId" class="summary-value">-</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Estado</div>
+                            <div class="summary-value"><span id="resultStatus" class="status-badge">-</span></div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Asunto</div>
+                            <div id="resultSubject" class="summary-value">-</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Agente asignado</div>
+                            <div id="resultAssignee" class="summary-value">-</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Creado</div>
+                            <div id="resultCreatedAt" class="summary-value">-</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Última actualización</div>
+                            <div id="resultUpdatedAt" class="summary-value">-</div>
+                        </div>
+                    </div>
+
+                    <div class="tracking-timeline" aria-label="Línea de avance del ticket">
+                        <div class="timeline-step" data-step="open">
+                            <span class="timeline-icon">🕘</span>
+                            <span class="timeline-title">Abierto</span>
+                        </div>
+                        <div class="timeline-step" data-step="assigned">
+                            <span class="timeline-icon">👤</span>
+                            <span class="timeline-title">Asignado</span>
+                        </div>
+                        <div class="timeline-step" data-step="in-progress">
+                            <span class="timeline-icon">🛠️</span>
+                            <span class="timeline-title">En proceso</span>
+                        </div>
+                        <div class="timeline-step" data-step="resolved">
+                            <span class="timeline-icon">✅</span>
+                            <span class="timeline-title">Resuelto</span>
+                        </div>
+                        <div class="timeline-step" data-step="closed">
+                            <span class="timeline-icon">🔒</span>
+                            <span class="timeline-title">Cerrado</span>
+                        </div>
+                    </div>
+
+                    <!-- Evidencia adjunta -->
+                    <div id="evidenceContainer" class="replies-container" style="display:none; margin-top:1.5rem;">
+                        <div class="section-title">🖼️ Evidencia adjunta</div>
+                        <div id="evidenceBox"></div>
+                    </div>
+
+                    <!-- Conversación del ticket -->
+                    <div id="repliesContainer" class="replies-container" style="display:none;">
+                        <div class="section-title">💬 Conversación del ticket</div>
+                        <div id="repliesList"></div>
+                    </div>
+
+                    <!-- Respuesta del cliente al soporte -->
+                    <div id="customerReplyContainer" class="replies-container" style="display:none; margin-top:1.5rem;">
+                        <div class="section-title">✍️ Responder al soporte</div>
+                        <p class="tracking-helper">Cuéntale al soporte si la solución funcionó o si el problema continúa.</p>
+                        <div id="customerReplyLocked" class="tracking-helper" style="display:none; padding:0.85rem; border:1px dashed var(--border-color,#d9dee8); border-radius:8px; background:var(--bg-secondary,#f8f9fa);">
+                            El chat se activará cuando el soporte técnico envíe el primer comentario dentro de este ticket.
+                        </div>
+                        <form id="customerReplyForm" style="display:grid; gap:0.75rem; margin-top:0.75rem;">
+                            <select id="problemSolved" style="padding:0.75rem; border:1px solid var(--border-color,#d9dee8); border-radius:8px;">
+                                <option value="">Selecciona una opción</option>
+                                <option value="yes">Sí, el problema quedó solucionado</option>
+                                <option value="partial">Parcialmente solucionado</option>
+                                <option value="no">No, el problema continúa</option>
+                            </select>
+                            <textarea id="customerReplyText" rows="4" maxlength="1500" placeholder="Escribe tu respuesta para el soporte técnico..." style="width:100%; padding:0.75rem; border:1px solid var(--border-color,#d9dee8); border-radius:8px; resize:vertical;"></textarea>
+                            <button type="submit" class="btn btn-primary" id="customerReplyButton">📨 Enviar respuesta al soporte</button>
+                        </form>
+                    </div>
+
+                    <!-- Historial de estados -->
+                    <div id="historyContainer" style="display:none; margin-top:1.5rem;">
+                        <div class="section-title">📊 Historial de cambios</div>
+                        <ul id="historyList" class="state-history-list"></ul>
+                    </div>
+
+                    <p class="tracking-helper" style="margin-top:1.5rem;">
+                        Si tu ticket aparece como resuelto pero aún necesitas ayuda, crea un nuevo ticket y referencia este número en la descripción.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 NexaCloud. Todos los derechos reservados.</p>
+        <p>
+            <a href="../form/form.html">Crear Ticket</a> |
+            <a href="../login/login.html">Panel de Soporte</a>
+        </p>
+    </footer>
+
+    <script>
+    let pollingTimer = null;
+    let lastTicketId = null;
+
+    async function loadNavbar() {
+        const container = document.getElementById('navbar-container');
+        if (!container) return;
+        try {
+            const res = await fetch('track-nav.html');
+            container.innerHTML = await res.text();
+            if (window.applySavedTheme) window.applySavedTheme();
+        } catch (err) { console.error('No se pudo cargar track-nav.html', err); }
+    }
+
+    function formatStatus(value) {
+        const labels = { open:'Abierto', assigned:'Asignado', 'in-progress':'En proceso', resolved:'Resuelto', closed:'Cerrado' };
+        return labels[value] || value || 'Abierto';
+    }
+
+    function formatDate(value) {
+        if (!value) return '-';
+        const d = new Date(value);
+        if (isNaN(d.getTime())) return value;
+        return d.toLocaleString('es-CO', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+    }
+
+    function escapeHtml(v) {
+        return String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+    }
+
+    function setText(id, value) { document.getElementById(id).textContent = value || '-'; }
+
+    function setStatusBadge(status) {
+        const badge = document.getElementById('resultStatus');
+        badge.className = 'status-badge status-' + (status || 'open');
+        badge.textContent = formatStatus(status);
+    }
+
+    function renderTimeline(status) {
+        const order = ['open', 'assigned', 'in-progress', 'resolved', 'closed'];
+        const currentIndex = Math.max(order.indexOf(status || 'open'), 0);
+        document.querySelectorAll('.timeline-step').forEach(step => {
+            const stepIndex = order.indexOf(step.dataset.step);
+            step.classList.remove('active','completed');
+            if (stepIndex < currentIndex) step.classList.add('completed');
+            if (stepIndex === currentIndex) step.classList.add('active');
+        });
+    }
+
+    function renderEvidence(evidence) {
+        const container = document.getElementById('evidenceContainer');
+        const box = document.getElementById('evidenceBox');
+        if (!evidence || !evidence.url) { container.style.display = 'none'; return; }
+        container.style.display = 'block';
+        box.innerHTML = `
+            <a href="${escapeHtml(evidence.url)}" target="_blank" rel="noopener" class="btn btn-secondary">🔍 Ver imagen completa</a>
+            <div style="margin-top:0.75rem;">
+                <img src="${escapeHtml(evidence.url)}" alt="Evidencia del problema" style="max-width:100%; border-radius:12px; border:1px solid var(--border-color,#d9dee8);">
+            </div>`;
+    }
+
+    function renderReplies(replies) {
+        const container = document.getElementById('repliesContainer');
+        const list = document.getElementById('repliesList');
+        if (!replies || replies.length === 0) { container.style.display = 'none'; return; }
+        container.style.display = 'block';
+        list.innerHTML = [...replies].sort((a, b) => new Date(a.time || 0) - new Date(b.time || 0)).map(r => {
+            const isClient = r.authorType === 'client';
+            const solvedLabel = r.problemSolved === 'yes' ? ' · ✅ solucionado' : r.problemSolved === 'no' ? ' · ❌ no solucionado' : r.problemSolved === 'partial' ? ' · ⚠️ parcial' : '';
+            return `<div class="reply-card">
+                <div class="reply-meta">
+                    <span>${isClient ? '🙋 Cliente' : '👤 Soporte'}: ${escapeHtml(r.author || (isClient ? 'Cliente' : 'Soporte'))}${solvedLabel}</span>
+                    <span>${escapeHtml(formatDate(r.time))}</span>
+                </div>
+                <div class="reply-text">${escapeHtml(r.text)}</div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderHistory(history) {
+        const container = document.getElementById('historyContainer');
+        const list = document.getElementById('historyList');
+        if (!history || history.length === 0) { container.style.display = 'none'; return; }
+        container.style.display = 'block';
+        list.innerHTML = [...history].sort((a, b) => new Date(a.time || 0) - new Date(b.time || 0)).map(h => `
+            <li>
+                <span>${escapeHtml(formatStatus(h.from))} <span class="sh-arrow">→</span> <strong>${escapeHtml(formatStatus(h.to))}</strong></span>
+                <span style="color:var(--text-secondary); margin-left:auto; font-size:0.8rem;">${escapeHtml(formatDate(h.time))}</span>
+            </li>`).join('');
+    }
+
+    function showError(msg) {
+        const box = document.getElementById('trackingError');
+        box.textContent = msg; box.classList.add('active');
+        document.getElementById('ticketResult').classList.remove('active');
+    }
+
+    function clearError() {
+        const box = document.getElementById('trackingError');
+        box.textContent = ''; box.classList.remove('active');
+    }
+
+    function renderTicket(ticket) {
+        const status = ticket.status || 'open';
+        setText('resultTicketId', ticket.ticketId || ticket.id);
+        setStatusBadge(status);
+        setText('resultSubject', ticket.subject);
+        const assigneeEl = document.getElementById('resultAssignee');
+        const assigneeEmail = ticket.assigneeEmail || ticket.assignee || '';
+        const assigneeName = ticket.assigneeName || ticket.agentName || ticket.supportName || '';
+        if (assigneeEmail || assigneeName) {
+            const visibleAssignee = assigneeName && assigneeEmail ? `${assigneeName} (${assigneeEmail})` : (assigneeName || assigneeEmail);
+            assigneeEl.innerHTML = `<span class="assignee-badge">👤 ${escapeHtml(visibleAssignee)}</span>`;
+        } else {
+            assigneeEl.textContent = 'Sin asignar aún';
+        }
+        setText('resultCreatedAt', formatDate(ticket.createdAt));
+        setText('resultUpdatedAt', formatDate(ticket.updatedAt));
+        renderTimeline(status);
+        renderEvidence(ticket.evidenceImage);
+        renderReplies(ticket.customerReplies);
+        renderCustomerReplyForm(ticket);
+        renderHistory(ticket.stateHistory);
+        document.getElementById('ticketResult').classList.add('active');
+    }
+
+    function renderCustomerReplyForm(ticket) {
+        const container = document.getElementById('customerReplyContainer');
+        const form = document.getElementById('customerReplyForm');
+        const locked = document.getElementById('customerReplyLocked');
+        if (!container || !form || !locked) return;
+
+        const status = ticket.status || 'open';
+        const replies = Array.isArray(ticket.customerReplies) ? ticket.customerReplies : [];
+        const hasSupportFirstComment = replies.some(r => String(r.authorType || '').toLowerCase() === 'support');
+
+        if (status === 'closed') {
+            container.style.display = 'none';
+            form.style.display = 'none';
+            locked.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'block';
+        if (hasSupportFirstComment) {
+            locked.style.display = 'none';
+            form.style.display = 'grid';
+        } else {
+            locked.style.display = 'block';
+            form.style.display = 'none';
+        }
+    }
+
+    async function sendCustomerReply(e) {
+        e.preventDefault();
+        if (!lastTicketId) return;
+        const textarea = document.getElementById('customerReplyText');
+        const solved = document.getElementById('problemSolved');
+        const button = document.getElementById('customerReplyButton');
+        const text = textarea.value.trim();
+        if (!text) { showError('Escribe un mensaje para el soporte.'); return; }
+        if (!solved.value) { showError('Selecciona si el problema fue solucionado o no.'); return; }
+        button.disabled = true;
+        button.textContent = '⏳ Enviando...';
+        clearError();
+        try {
+            const res = await submitCustomerReply(lastTicketId, {
+                customerReply: text,
+                actor: 'Cliente',
+                authorType: 'client',
+                problemSolved: solved.value
+            });
+            if (!res.success) throw new Error(res.message || 'No fue posible enviar la respuesta.');
+            textarea.value = '';
+            solved.value = '';
+            await handleTracking(lastTicketId, true);
+            alert('✅ Respuesta enviada al soporte técnico.');
+        } catch (err) {
+            showError(err.message || 'No fue posible enviar la respuesta.');
+        } finally {
+            button.disabled = false;
+            button.textContent = '📨 Enviar respuesta al soporte';
+        }
+    }
+
+    async function handleTracking(ticketId, silent = false) {
+        const cleanId = String(ticketId || '').trim().toUpperCase();
+        if (!cleanId) { showError('Ingresa un número de ticket válido.'); return; }
+
+        const button = document.getElementById('trackButton');
+        if (!silent) { button.disabled = true; button.textContent = '⏳ Consultando...'; clearError(); }
+
+        try {
+            const res = await trackTicket(cleanId);
+            if (!res.success) throw new Error(res.message || 'No fue posible consultar el ticket.');
+            lastTicketId = cleanId;
+            renderTicket(res.ticket);
+            if (!silent) startPolling(cleanId);
+        } catch (err) {
+            if (!silent) showError(err.message || 'No encontramos un ticket con ese número.');
+        } finally {
+            if (!silent) { button.disabled = false; button.textContent = '🔎 Consultar Estado'; }
+        }
+    }
+
+    function startPolling(ticketId) {
+        if (pollingTimer) clearInterval(pollingTimer);
+        pollingTimer = setInterval(() => handleTracking(ticketId, true), 20000);
+    }
+
+    document.getElementById('customerReplyForm').addEventListener('submit', sendCustomerReply);
+
+    document.getElementById('trackingForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (pollingTimer) clearInterval(pollingTimer);
+        handleTracking(document.getElementById('ticketIdInput').value);
+    });
+
+    loadNavbar();
+
+    const params = new URLSearchParams(window.location.search);
+    const ticketFromUrl = params.get('id');
+    if (ticketFromUrl) {
+        document.getElementById('ticketIdInput').value = ticketFromUrl;
+        handleTracking(ticketFromUrl);
+    }
+    </script>
+</body>
+</html>

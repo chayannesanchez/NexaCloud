@@ -1,0 +1,196 @@
+.tracking-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.tracking-card {
+    background: white;
+    border-radius: 1rem;
+    box-shadow: var(--shadow-lg);
+    padding: 2rem;
+    border: 1px solid var(--border-color);
+}
+
+.tracking-form {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1rem;
+    align-items: end;
+    margin-bottom: 1.5rem;
+}
+
+.tracking-helper {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+}
+
+.ticket-result {
+    display: none;
+    margin-top: 2rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 2rem;
+}
+
+.ticket-result.active {
+    display: block;
+}
+
+.ticket-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.summary-item {
+    background: var(--background-light);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+}
+
+.summary-label {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.35rem;
+}
+
+.summary-value {
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    word-break: break-word;
+}
+
+.tracking-timeline {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+    margin: 2rem 0 1rem;
+}
+
+.timeline-step {
+    position: relative;
+    background: #F3F4F6;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    text-align: center;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+.timeline-step.active {
+    background: #DBEAFE;
+    color: #1E40AF;
+    border-color: #93C5FD;
+}
+
+.timeline-step.completed {
+    background: #DCFCE7;
+    color: #166534;
+    border-color: #86EFAC;
+}
+
+.timeline-icon {
+    display: block;
+    font-size: 1.6rem;
+    margin-bottom: 0.5rem;
+}
+
+.timeline-title {
+    display: block;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.tracking-alert {
+    padding: 1rem;
+    border-radius: 0.75rem;
+    margin-top: 1rem;
+    display: none;
+}
+
+.tracking-alert.active {
+    display: block;
+}
+
+.tracking-alert.error {
+    background: #FEE2E2;
+    color: #991B1B;
+    border: 1px solid #FCA5A5;
+}
+
+.copy-box {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 700px) {
+    .tracking-form {
+        grid-template-columns: 1fr;
+    }
+
+    .tracking-timeline {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* UI REFRESH - Seguimiento compacto */
+.tracking-container { max-width: 780px; }
+.tracking-card { padding: 1.25rem; border-radius: 1rem; }
+.tracking-form { gap: 0.75rem; margin-bottom: 1rem; }
+.tracking-helper { font-size: 0.88rem; margin-bottom: 1rem; }
+.ticket-result { margin-top: 1.25rem; padding-top: 1.25rem; }
+.ticket-summary-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+.summary-item { padding: 0.8rem; border-radius: 0.8rem; background: #F8FAFC; }
+.summary-label { font-size: 0.7rem; }
+.summary-value { font-size: 0.9rem; }
+.tracking-timeline { gap: 0.55rem; margin: 1.25rem 0 0.75rem; }
+.timeline-step { padding: 0.78rem; border-radius: 0.8rem; }
+.timeline-icon { font-size: 1.25rem; margin-bottom: 0.25rem; }
+.timeline-title { font-size: 0.78rem; }
+.tracking-alert { padding: 0.75rem; border-radius: 0.75rem; }
+.copy-box { gap: 0.5rem; }
+
+/* =====================================================
+   TRACK DARK MODE VISIBILITY HOTFIX 2026-05-29-B
+   ===================================================== */
+html[data-theme="dark"] .ticket-summary-grid .summary-item,
+html[data-theme="dark"] .replies-container,
+html[data-theme="dark"] #customerReplyLocked,
+html[data-theme="dark"] #evidenceContainer,
+html[data-theme="dark"] #repliesContainer,
+html[data-theme="dark"] #customerReplyContainer {
+    background: var(--surface-panel, #101D31) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+html[data-theme="dark"] #customerReplyLocked {
+    background: #10213A !important;
+    color: #D9E7F7 !important;
+    border: 1px dashed #3B82F6 !important;
+}
+
+html[data-theme="dark"] .tracking-helper,
+html[data-theme="dark"] #customerReplyLocked,
+html[data-theme="dark"] .section-title,
+html[data-theme="dark"] .summary-value,
+html[data-theme="dark"] .summary-label {
+    color: #EAF2FF !important;
+}
+
+html[data-theme="dark"] #problemSolved,
+html[data-theme="dark"] #customerReplyText {
+    background: #0B1628 !important;
+    color: #F3F7FC !important;
+    border-color: #33445E !important;
+}
