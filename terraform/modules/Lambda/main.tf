@@ -48,30 +48,30 @@ resource "aws_iam_policy" "lambda_policy" {
         Resource = "${aws_cloudwatch_log_group.lambda.arn}:*"
       },
       {
-        Effect   = "Allow"
-        Action   = var.dynamodb_actions
+        Effect = "Allow"
+        Action = var.dynamodb_actions
         Resource = concat(
           [var.table_arn, "${var.table_arn}/index/*"],
           var.agents_table_arn != "" ? [var.agents_table_arn, "${var.agents_table_arn}/index/*"] : []
         )
       }
-    ],
-    var.s3_bucket_arn != "" ? [
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:PutObject",
-          "s3:GetObject"
-        ]
-        Resource = "${var.s3_bucket_arn}/*"
-      }
-    ] : [],
-    var.cognito_user_pool_arn != "" && length(var.cognito_actions) > 0 ? [
-      {
-        Effect   = "Allow"
-        Action   = var.cognito_actions
-        Resource = var.cognito_user_pool_arn
-      }
+      ],
+      var.s3_bucket_arn != "" ? [
+        {
+          Effect = "Allow"
+          Action = [
+            "s3:PutObject",
+            "s3:GetObject"
+          ]
+          Resource = "${var.s3_bucket_arn}/*"
+        }
+      ] : [],
+      var.cognito_user_pool_arn != "" && length(var.cognito_actions) > 0 ? [
+        {
+          Effect   = "Allow"
+          Action   = var.cognito_actions
+          Resource = var.cognito_user_pool_arn
+        }
     ] : [])
   })
 
