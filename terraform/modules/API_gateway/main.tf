@@ -8,11 +8,11 @@ resource "aws_api_gateway_rest_api" "api" {
 }
 
 resource "aws_api_gateway_authorizer" "cognito" {
-  count         = var.enable_cognito_auth ? 1 : 0
-  name          = "nexacloud-cognito-authorizer"
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  type          = "COGNITO_USER_POOLS"
-  provider_arns = [var.cognito_user_pool_arn]
+  count           = var.enable_cognito_auth ? 1 : 0
+  name            = "nexacloud-cognito-authorizer"
+  rest_api_id     = aws_api_gateway_rest_api.api.id
+  type            = "COGNITO_USER_POOLS"
+  provider_arns   = [var.cognito_user_pool_arn]
   identity_source = "method.request.header.Authorization"
 }
 
@@ -653,10 +653,10 @@ resource "aws_api_gateway_method" "agents_options" {
 }
 
 resource "aws_api_gateway_integration" "agents_options" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  resource_id = aws_api_gateway_resource.agents.id
-  http_method = aws_api_gateway_method.agents_options.http_method
-  type        = "MOCK"
+  rest_api_id       = aws_api_gateway_rest_api.api.id
+  resource_id       = aws_api_gateway_resource.agents.id
+  http_method       = aws_api_gateway_method.agents_options.http_method
+  type              = "MOCK"
   request_templates = { "application/json" = "{\"statusCode\": 200}" }
 }
 
@@ -688,10 +688,10 @@ resource "aws_api_gateway_method" "agents_id_options" {
 }
 
 resource "aws_api_gateway_integration" "agents_id_options" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  resource_id = aws_api_gateway_resource.agents_id.id
-  http_method = aws_api_gateway_method.agents_id_options.http_method
-  type        = "MOCK"
+  rest_api_id       = aws_api_gateway_rest_api.api.id
+  resource_id       = aws_api_gateway_resource.agents_id.id
+  http_method       = aws_api_gateway_method.agents_id_options.http_method
+  type              = "MOCK"
   request_templates = { "application/json" = "{\"statusCode\": 200}" }
 }
 
